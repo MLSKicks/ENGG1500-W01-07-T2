@@ -63,3 +63,41 @@ while True:
 
     left_sum_error += left_error
     right_sum_error += right_error
+
+## PID Class
+class PIDController():
+    left_speed, right_speed = (0,0)
+    left_error, right_error = (0,0)
+    prev_left_error, prev_right_error = (0,0)
+    left_error_sum, right_error_sum = (0,0)
+
+    def __init__(self, SAMPLE_TIME, TARGET, KP, KD, KI):
+        self.SAMPLE_TIME = SAMPLE_TIME
+        self.TARGET = TARGET
+        self.KP = KP
+        self.KD = KD
+        self.KI = KI
+
+    @classmethod
+    def proportional(cls):
+        cls.left_speed += (cls.left_error * self.KP)
+        cls.right_speed += (cls.right_error * self.KP)
+        return cls.left_speed, cls.right_speed
+
+    @classmethod
+    def derivative(cls):
+        cls.left_speed += (cls.prev_left_error * self.KD)
+        cls.right_speed += (cls.prev_right_error * self.KD)
+        return cls.left_speed, cls.right_speed
+
+    @classmethod
+    def integral(cls):
+        cls.left_speed += (cls.left_error_sum * self.KI)
+        cls.right_speed += (cls.right_error_sum * self.KI)
+        return cls.left_speed, cls.right_speed
+
+    @classmethod
+    def save_error(cls):
+        cls.prev_left_error, cls.prev_right_error = (cls.left_error, cls.right_error)
+        cls.left_error_sum, cls.right_error_sum += (cls.left_error, cls.right_error)
+
