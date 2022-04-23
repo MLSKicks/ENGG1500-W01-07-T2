@@ -29,6 +29,15 @@ class Screen:
         self.oled.fill(0)
         self.oled.show()
 
+    def fill_rect(self, col, row, width, height, colour=1):
+        """Simple wrapper for oled.rect(...) NOTE: DOES NOT SHOW"""
+        self.oled.fill_rect(col*_CHAR_WIDTH, row*_CHAR_HEIGHT, width*_CHAR_WIDTH, height*_CHAR_HEIGHT, colour)
+
+    def print_unformatted(self, message, col, row, colour=1):
+        """Simple wrapper for oled.text(...)"""
+        self.oled.text(message, col*_CHAR_WIDTH, row*_CHAR_HEIGHT, colour)
+        self.oled.show()
+
     def print(self, message):
         """
             Fits a message onto the screen by breaking words apart without mercy.
@@ -43,12 +52,12 @@ class Screen:
         cur_line = ""
         while i < len(message):
             if col >= _COL_SIZE:  # print each complete row and then increment to the next row
-                self.oled.text(cur_line, 0, row*_CHAR_HEIGHT)
+                self.oled.text(cur_line, 0, row * _CHAR_HEIGHT)
                 row += 1
                 col = 0
                 cur_line = ""
             elif message[i] == '\n':  # handle newlines correctly
-                self.oled.text(cur_line, 0, row*_CHAR_HEIGHT)
+                self.oled.text(cur_line, 0, row * _CHAR_HEIGHT)
                 row += 1
                 col = 0
                 cur_line = ""
