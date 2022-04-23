@@ -12,8 +12,8 @@ class Motor(object):
         """
                 :rtype: object
                 :type side: str
-                :type in1_pin: str
-                :type in2_pin: str
+                :type in1_pin: int
+                :type in2_pin: int
                 :type en_pin: str
                 The arguments are:
                 - ``side``  should be the strings: "left" or "right". Used to specify motor.
