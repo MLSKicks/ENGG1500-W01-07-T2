@@ -1,5 +1,6 @@
 from machine import Pin, I2C
 from time import ticks_ms, ticks_diff, sleep_ms
+import os
 import oled_screen
 import rgb_sensor
 import us_sensor
@@ -43,6 +44,22 @@ class Vehicle:
             self.us_sensor = us_sensor.Sensor(trig=3, echo=2)
         if init_ir:
             self.ir_sensor = ir_sensor.Sensor(Pin(26))
+            try:
+                f = open('ir1.txt', 'r')
+                self.ir_sensor.set_sensitivity(int(f.read()))
+                f.close()
+            except OSError:
+                f = open('ir1.txt', 'w')
+                self.calibrate_ir(self.ir_sensor, 1)
+                f.write(str(self.ir_sensor.get_sensitivity()))
+                f.close()
+            except ValueError:
+                os.remove('ir1.txt')
+                f = open('ir1.txt', 'w')
+                self.calibrate_ir(self.ir_sensor, 1)
+                f.write(str(self.ir_sensor.get_sensitivity()))
+                f.close()
+
         if init_encoder:
             self.encoder = encoder.Encoder(18, 19)
             self.pid = pid_control.PIDController(self.encoder)
@@ -106,7 +123,7 @@ class Vehicle:
                 self.screen.print_unformatted(". " * animation_stage, 5, 6)
                 animation_stage = (animation_stage + 1) % 4  # loop animation
             # delay
-            self.update_sleep(150)
+            sleep_ms(150)
 
         self.screen.print("~Calibrate IR~\nHold IR" + str(ir_num) + " above\nthe OFF-ROAD surface")
         for i in range(5, 0, -1):  # countdown
@@ -126,7 +143,7 @@ class Vehicle:
                 self.screen.print_unformatted(". " * animation_stage, 5, 6)
                 animation_stage = (animation_stage + 1) % 4  # loop animation
             # delay
-            self.update_sleep(150)
+            sleep_ms(150)
 
         # calculate sensitivity threshold as in between road and off-road readings
         road = min(road_readings)
