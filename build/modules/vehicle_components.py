@@ -61,7 +61,7 @@ class Vehicle:
                 f.close()
 
         if init_encoder:
-            self.encoder = encoder.Encoder(18, 19)
+            self.encoder = encoder.Encoder(19, 18)  # ENC_L corresponds to MOTOR_RIGHT so have to swap pin order!
             self.pid = pid_control.PIDController(self.encoder)
 
         # initialise constants
