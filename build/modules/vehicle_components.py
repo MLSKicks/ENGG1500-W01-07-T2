@@ -1,5 +1,6 @@
 from machine import Pin, I2C
 from time import ticks_ms, ticks_diff, sleep_ms
+from array import array
 import os
 import oled_screen
 import rgb_sensor
@@ -8,7 +9,6 @@ import ir_sensor
 import encoder
 import motor
 import pid_control
-
 
 # - - - - - - - - - - - - - - - - - - - - DEBUG PRINTING - - - - - - - - - - - - - - - - - - - - #
 def print_device_info(devices):
@@ -23,7 +23,13 @@ def print_device_info(devices):
 
 class Vehicle:
     # - - - - - - - - - - - - - - - - - - - - INITIALISATION - - - - - - - - - - - - - - - - - - - - #
-    def __init__(self, init_screen=True, init_rgb=True, init_us=True, init_ir=True, init_encoder=True, init_motor=True):
+    def __init__(self,
+                 init_screen=False,
+                 init_rgb=False,
+                 init_us=False,
+                 init_ir=False,
+                 init_encoder=False,
+                 init_motor=False):
         """Sets up oled display and rgb sensor on I2C channel 0, sda=Pin(12), scl=Pin(13)."""
         # initialise motor
         if init_motor:
@@ -103,6 +109,7 @@ class Vehicle:
             sleep_ms(self.SENSOR_SLEEP_MS)
 
     # - - - - - - - - - - - - - - - - - - - - CALIBRATION ROUTINES - - - - - - - - - - - - - - - - - - - - #
+
     def calibrate_ir(self, ir, ir_num):
         """Calibrates the IR Sensor to distinguish between road and off-road surfaces"""
         self.screen.print("~Calibrate IR~\nHold IR" + str(ir_num) + " above\nthe ROAD surface")
@@ -204,3 +211,4 @@ class Vehicle:
 
         for (us, rgb) in zip(us_readings, rgb_readings):
             print("us: {} -> rgb: {}".format(us, rgb))
+
