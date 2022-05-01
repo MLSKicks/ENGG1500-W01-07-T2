@@ -37,17 +37,11 @@ class Encoder(object):
         else:
             self.right_fwd = True
 
-    def set_left_bkwd(self):
-        self.left_fwd = False
+    def set_left_dir(self, dir_bool):
+        self.left_fwd = dir_bool
 
-    def set_left_fwd(self):
-        self.left_fwd = True
-
-    def set_right_bkwd(self):
-        self.right_fwd = False
-
-    def set_right_fwd(self):
-        self.right_fwd = True
+    def set_right_dir(self, dir_bool):
+        self.right_fwd = dir_bool
 
     def get_left(self):
         return self._count_left
