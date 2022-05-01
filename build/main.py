@@ -1,10 +1,11 @@
 import vehicle_components
 from time import sleep_ms
+from PID import PID
 
 
 def ir_sensor_demo():
     # initialise
-    vehicle = vehicle_components.Vehicle(init_rgb=False, init_encoder=False, init_motor=False)
+    vehicle = vehicle_components.Vehicle(init_ir=True, init_screen=True)
     screen = vehicle.screen
     ir = vehicle.ir_sensor
 
@@ -27,7 +28,7 @@ def ir_sensor_demo():
 
 def rgb_sensor_demo():
     # initialise
-    vehicle = vehicle_components.Vehicle(init_ir=False)
+    vehicle = vehicle_components.Vehicle(init_screen=True, init_rgb=True, init_us=True)
     screen = vehicle.screen
     rgb = vehicle.rgb_sensor
     us = vehicle.us_sensor
@@ -52,59 +53,50 @@ def rgb_sensor_demo():
         vehicle.update_sleep(300)
 
 
-def pid_run(loops, sleep, kp, ki, kd, target_mm):
-    vehicle = vehicle_components.Vehicle(init_screen=True, init_rgb=False, init_ir=True, init_us=False)
+def run_pid(target_mm_l, target_mm_r, kp, ki, kd, loops=30, sleep=50):
+    vehicle = vehicle_components.Vehicle(init_screen=True, init_ir=True, init_encoder=True, init_motor=True)
     pid = vehicle.pid
-    pid.reset(kp, ki, kd)
-    pid.set_target(target_mm)
+    pid.reset(target_mm_l, target_mm_r, kp, ki, kd)
     sleep_ms(65)
     for i in range(0, loops, 1):
         lduty, rduty = pid.run()
         vehicle.set_motor(lduty, rduty)
-        pid.update_encoder(lduty, rduty)
-        print("i = {}, lduty = {}, rduty = {}\nenc_l = {}, enc_r = {}".format(i, lduty, rduty, vehicle.encoder.get_left(), vehicle.encoder.get_right()))
+        # pid.update_encoder()
+        # print("i = {}, lduty = {}, rduty = {}\nenc_l = {}, enc_r = {}".format(i, lduty, rduty, vehicle.encoder.get_left(), vehicle.encoder.get_right()))
         vehicle.screen.print("i={}\nlduty={}\nrduty={}\nir_road={}".format(i, lduty, rduty,
                                                                            vehicle.ir_sensor.is_on_road()))
         sleep_ms(sleep)
-    stop_motor()
-
-
-def pid_demo():
-    vehicle = vehicle_components.Vehicle(init_screen=True, init_rgb=False, init_ir=True, init_us=False)
-    pid = vehicle.pid
-    sleep_ms(65)
-    for i in range(0, 100, 1):
-        lduty, rduty = pid.run()
-        vehicle.set_motor(lduty, rduty)
-        pid.update_encoder(lduty, rduty)
-        print("i = {}, lduty = {}, rduty = {}".format(i, lduty, rduty))
-        vehicle.screen.print("i={}\nlduty={}\nrduty={}\nir_road={}".format(i, lduty, rduty,
-                                                                           vehicle.ir_sensor.is_on_road()))
-        sleep_ms(150)
-    stop_motor()
+    vehicle.set_motor(0, 0)
 
 
 def stop_motor():
-    vehicle = vehicle_components.Vehicle(init_screen=True, init_rgb=False, init_ir=True, init_us=False)
-    vehicle.set_motor(0,0)
+    vehicle = vehicle_components.Vehicle(init_motor=True)
+    vehicle.set_motor(0, 0)
 
 
 def oled_demo():
-    vehicle = vehicle_components.Vehicle(init_rgb=False, init_us=False, init_ir=False, init_encoder=False, init_motor=False)
+    vehicle = vehicle_components.Vehicle(init_screen=True)
     screen = vehicle.screen
     screen.print("hi")
 
 
 def main():
-    vehicle = vehicle_components.Vehicle(init_rgb=False, init_us=False)
+    vehicle = vehicle_components.Vehicle(init_motor=True, init_encoder=True, init_screen=True, init_ir=True)
+    pid = vehicle.pid
+    screen = vehicle.screen
 
     # enumeration of states
+    STATE_NULL = -1
     STATE_PRINT_ART = 0
     STATE_DRIVE_FWD = 1
     STATE_DRIVE_BKWD = 2
-    STATE_PRINT_IR = 3
+    STATE_TURN_LEFT = 3
+    STATE_TURN_RIGHT = 4
+    STATE_PRINT_IR = 5
+    transition_flag = True
 
     # initial state
+    prev_state = STATE_NULL
     state = STATE_PRINT_ART
     lduty = 0
     rduty = 0
@@ -112,28 +104,71 @@ def main():
     while True:
         # collect sensor data
 
-        # make decisions
+        # set transition flag
+        transition_flag = False
+        if prev_state != state:
+            transition_flag = True
+
+        # update prev_state
+        prev_state = state
+
+        # state machine
         if state == STATE_PRINT_ART:
-            vehicle.screen.print_ascii_art(
+            # state actions
+            screen.print_ascii_art(
                 "State: PRINT_ART\n\n    _,,/|\n    \\o o'\n    =_~_=\n    /   \\ (\\\n   (////_)//\n   ~~~")
             lduty, rduty = 0, 0
+
             # state transition
-            state += 1
+            state = STATE_DRIVE_FWD
 
         elif state == STATE_DRIVE_FWD:
-            vehicle.screen.print("State: DRIVE_FWD")
-            lduty, rduty = 50, 50
+            # state actions
+            screen.print("State: DRIVE_FWD")
+            if transition_flag:
+                pid.reset_target(100, 100)
+            lduty, rduty = pid.run()
+
             # state transition
-            state += 1
+            if pid.target_met():
+                state = STATE_TURN_LEFT
 
         elif state == STATE_DRIVE_BKWD:
-            vehicle.screen.print("State: DRIVE_BKWD")
-            lduty, rduty = -50, -50
+            # state actions
+            screen.print("State: DRIVE_BKWD")
+            if transition_flag:
+                pid.reset_target(-100, -100)
+            lduty, rduty = pid.run()
+
             # state transition
-            state += 1
+            if pid.target_met():
+                state = STATE_TURN_RIGHT
+
+        elif state == STATE_TURN_LEFT:
+            # state actions
+            screen.print("State: TURN_LEFT")
+            if transition_flag:
+                pid.reset_target(157, 377)
+            lduty, rduty = pid.run()
+
+            # state transition
+            if pid.target_met():
+                state = STATE_DRIVE_BKWD
+
+        elif state == STATE_TURN_RIGHT:
+            # state actions
+            screen.print("State: TURN_RIGHT")
+            if transition_flag:
+                pid.reset_target(377, 157)
+            lduty, rduty = pid.run()
+
+            # state transition
+            if pid.target_met():
+                state = STATE_PRINT_IR
 
         elif state == STATE_PRINT_IR:
-            vehicle.screen.print("State: PRINT_IR\n\nIR_Road={}".format(vehicle.ir_sensor.is_on_road()))
+            # state actions
+            screen.print("State: PRINT_IR\n\nIR_Road={}".format(vehicle.ir_sensor.is_on_road()))
             lduty, rduty = 0, 0
             # state transition
             state = STATE_PRINT_ART
@@ -145,4 +180,4 @@ def main():
 
 if __name__ == "__main__":
     sleep_ms(1000)
-    pid_run(100, 50, 1.425, 0.00097, 33, 2000)
+    main()
