@@ -1,5 +1,5 @@
 import vehicle_components
-from time import sleep_ms
+from time import sleep_ms, time
 from PID import PID
 
 
@@ -93,6 +93,7 @@ def main():
     STATE_TURN_LEFT = 3
     STATE_TURN_RIGHT = 4
     STATE_PRINT_IR = 5
+    STATE_IDLE = 6
     transition_flag = True
 
     # initial state
@@ -168,10 +169,33 @@ def main():
 
         elif state == STATE_PRINT_IR:
             # state actions
-            screen.print("State: PRINT_IR\n\nIR_Road={}".format(vehicle.ir_sensor.is_on_road()))
+            is_on_road = vehicle.ir_sensor.is_on_road()
+            screen.print("State: PRINT_IR\n\nIR_Road={}".format(is_on_road))
             lduty, rduty = 0, 0
             # state transition
-            state = STATE_PRINT_ART
+            if is_on_road:
+                state = STATE_PRINT_ART
+            else:
+                state = STATE_IDLE
+
+        elif state == STATE_IDLE:
+            # state actions
+            screen.print("State: IDLE")
+            if transition_flag or pid.target_met():
+                pid.reset_target(150, 150)
+            counter = 0
+            while counter < 60:
+                lduty, rduty =  pid.run()
+                counter += 1
+            if counter >= 60:
+                lduty, rduty = 0, 0
+                while True: print("Help Me!") # Requires Human Intervention
+
+            # state transition
+            if vehicle.ir_sensor.is_on_road():
+                state = STATE_PRINT_ART
+            
+
 
         # control motors
         vehicle.set_motor(lduty, rduty)
