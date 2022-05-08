@@ -1,13 +1,13 @@
 from machine import ADC
 
 
-class Sensor:
+class InfraRed:
     def __init__(self, analog_pin):
         """Initialise IR Sensor object"""
         self.adc = ADC(analog_pin)
 
         # sensitivity constants
-        self.SENSITIVITY = 4000  # any analog voltage above this is considered 'road'
+        self.SENSITIVITY = 10000  # any analog voltage above this is considered 'road'
 
     def set_sensitivity(self, sensitivity):
         self.SENSITIVITY = sensitivity
