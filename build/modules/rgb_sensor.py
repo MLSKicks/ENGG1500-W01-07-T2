@@ -35,7 +35,7 @@ def rgb_to_hue(r, g, b):
     return int(h)
 
 
-class Sensor:
+class RGB:
     def __init__(self, bus):
         """Initialise RGB Sensor proximity and light sensing"""
         # initialise RBG sensor library
