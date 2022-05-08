@@ -24,7 +24,7 @@ def clamp(duty, max_duty, min_duty):
 
 
 class PIDController:
-    def __init__(self, encoder, target_mm_left=0, target_mm_right=0, kp=1.5, ki=0.0001, kd=0.5):
+    def __init__(self, encoder, target_mm_left=0, target_mm_right=0, kp=2, ki=0.00015, kd=1):
         """initialise all PID controller constants, variables, and encoder object"""
         # initialise target and encoder object
         self.target_clicks_left = mm_to_clicks(target_mm_left)
