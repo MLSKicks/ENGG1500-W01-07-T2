@@ -108,3 +108,7 @@ class RGB:
     def blue(self):
         """return blue light level"""
         return self.apds9960.als.blueLightLevel + self.B_ADJUSTMENT
+
+    def is_on_road(self):
+        # TODO: NICH MAKE THIS SEE BLACK
+        return True
