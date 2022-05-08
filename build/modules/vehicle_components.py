@@ -3,10 +3,10 @@ from time import ticks_ms, ticks_diff, sleep_ms
 from array import array
 import os
 import oled_screen
-import rgb_sensor
-import us_sensor
-import ir_sensor
-import encoder
+from rgb_sensor import RGB
+from us_sensor import UltraSonic
+from ir_sensor import InfraRed
+from encoder import EncoderClicker
 import motor
 import pid_control
 
@@ -23,51 +23,45 @@ def print_device_info(devices):
 
 class Vehicle:
     # - - - - - - - - - - - - - - - - - - - - INITIALISATION - - - - - - - - - - - - - - - - - - - - #
-    def __init__(self,
-                 init_screen=False,
-                 init_rgb=False,
-                 init_us=False,
-                 init_ir=False,
-                 init_encoder=False,
-                 init_motor=False):
+    def __init__(self, init_screen=False, init_rgb=False, init_us_l=False, init_us_r=False,
+                 init_ir_l=False, init_ir_r=False, init_encoder=False, init_motor=False):
         """Sets up oled display and rgb sensor on I2C channel 0, sda=Pin(12), scl=Pin(13)."""
+        self.init_screen = init_screen
+        self.init_rgb = init_rgb
+        self.init_us_l = init_us_l
+        self.init_us_r = init_us_r
+        self.init_ir_l = init_ir_l
+        self.init_ir_r = init_ir_r
+        self.init_encoder = init_encoder
+        self.init_motor = init_motor
+
         # initialise motor
-        if init_motor:
+        if self.init_motor:
             self.left_motor = motor.Motor("left", 8, 9, 6)
             self.right_motor = motor.Motor("right", 10, 11, 7)
 
         # initialise i2c devices
-        if init_screen or init_rgb:
+        if self.init_screen or self.init_rgb:
             self.i2c_bus = I2C(0, sda=Pin(12), scl=Pin(13))
             print_device_info(self.i2c_bus.scan())  # print debugging info
-        if init_screen:
+        if self.init_screen:
             self.screen = oled_screen.Screen(self.i2c_bus)
-        if init_rgb:
-            self.rgb_sensor = rgb_sensor.Sensor(self.i2c_bus)
+        if self.init_rgb:
+            self.rgb = RGB(self.i2c_bus)
 
-        # initialise other sensors
-        if init_us:
-            self.us_sensor = us_sensor.Sensor(trig=3, echo=2)
-        if init_ir:
-            self.ir_sensor = ir_sensor.Sensor(Pin(26))
-            try:
-                f = open('ir1.txt', 'r')
-                self.ir_sensor.set_sensitivity(int(f.read()))
-                f.close()
-            except OSError:
-                f = open('ir1.txt', 'w')
-                self.calibrate_ir(self.ir_sensor, 1)
-                f.write(str(self.ir_sensor.get_sensitivity()))
-                f.close()
-            except ValueError:
-                os.remove('ir1.txt')
-                f = open('ir1.txt', 'w')
-                self.calibrate_ir(self.ir_sensor, 1)
-                f.write(str(self.ir_sensor.get_sensitivity()))
-                f.close()
-
-        if init_encoder:
-            self.encoder = encoder.Encoder(19, 18)  # ENC_L corresponds to MOTOR_RIGHT so have to swap pin order!
+        # initialise sensors
+        if self.init_us_l:
+            self.us_l = UltraSonic(trig=3, echo=2)
+        if self.init_us_r:
+            self.us_r = UltraSonic(trig=5, echo=4)
+        if self.init_ir_l:
+            self.ir_l = InfraRed(Pin(27))
+            self.get_calibration_ir('ir_l.txt', 'L', self.ir_l)
+        if self.init_ir_r:
+            self.ir_r = InfraRed(Pin(26))
+            self.get_calibration_ir('ir_r.txt', 'R', self.ir_r)
+        if self.init_encoder:
+            self.encoder = EncoderClicker(19, 18)  # ENC_L corresponds to MOTOR_RIGHT so have to swap pin order!
             self.pid = pid_control.PIDController(self.encoder)
 
         # initialise constants
@@ -79,14 +73,11 @@ class Vehicle:
             :type: lduty: int
             :type: rduty: int"""
         # sanitise input (0 <= left duty & right duty <= 100)
-        if lduty > 100:
-            lduty = 100
-        elif lduty < -100:
-            lduty = -100
-        if rduty > 100:
-            rduty = 100
-        elif rduty < -100:
-            rduty = -100
+        lduty = min(lduty, 100)
+        rduty = min(rduty, 100)
+        lduty = max(lduty, -100)
+        rduty = max(rduty, -100)
+
         # a negative duty means rotate backwards
         if lduty > 0:
             self.left_motor.set_forwards()
@@ -105,14 +96,33 @@ class Vehicle:
         """Sleeps for a time (ms) while maintaining sensor readings"""
         t0 = ticks_ms()
         while ticks_diff(ticks_ms(), t0) < milliseconds:
-            self.us_sensor.proximity()
+            if self.init_us_l:
+                self.us_l.proximity()
+            if self.init_us_r:
+                self.us_r.proximity()
             sleep_ms(self.SENSOR_SLEEP_MS)
 
     # - - - - - - - - - - - - - - - - - - - - CALIBRATION ROUTINES - - - - - - - - - - - - - - - - - - - - #
+    def get_calibration_ir(self, ir_str, ir_letter, ir):
+        try:
+            f = open(ir_str, 'r')
+            ir.set_sensitivity(int(f.read()))
+            f.close()
+        except OSError:
+            f = open(ir_str, 'w')
+            self.calibrate_ir(ir, ir_letter)
+            f.write(str(ir.get_sensitivity()))
+            f.close()
+        except ValueError:
+            os.remove(ir_str)
+            f = open(ir_str, 'w')
+            self.calibrate_ir(ir, ir_letter)
+            f.write(str(ir.get_sensitivity()))
+            f.close()
 
-    def calibrate_ir(self, ir, ir_num):
+    def calibrate_ir(self, ir, ir_letter):
         """Calibrates the IR Sensor to distinguish between road and off-road surfaces"""
-        self.screen.print("~Calibrate IR~\nHold IR" + str(ir_num) + " above\nthe ROAD surface")
+        self.screen.print("~Calibrate IR~\nHold IR" + ir_letter + " above\nthe ROAD surface")
         for i in range(5, 0, -1):  # countdown
             self.screen.fill_rect(0, 7, 16, 1, 0)  # clear old msg
             self.screen.print_unformatted("Measuring in " + str(i), 1, 7)
@@ -132,7 +142,7 @@ class Vehicle:
             # delay
             sleep_ms(150)
 
-        self.screen.print("~Calibrate IR~\nHold IR" + str(ir_num) + " above\nthe OFF-ROAD surface")
+        self.screen.print("~Calibrate IR~\nHold IR" + ir_letter + " above\nthe OFF-ROAD surface")
         for i in range(5, 0, -1):  # countdown
             self.screen.fill_rect(0, 7, 16, 1, 0)  # clear old msg
             self.screen.print_unformatted("Measuring in " + str(i), 1, 7)
@@ -164,16 +174,16 @@ class Vehicle:
         else:  # let's try again since we didn't get a clear distinction
             self.screen.print("~Calibrate IR~\nError: unclear distinction between road and off-road. Retry!")
             sleep_ms(2000)
-            self.calibrate_ir(ir, ir_num)
+            self.calibrate_ir(ir, ir_letter)
 
-    def calibrate_rgb(self):
+    def calibrate_rgb(self, reference_us):
         """Calibrates RGB Sensor based on Ultrasonic Sensor data"""
         clearance = 25
         self.screen.clear()
         self.screen.print("~Calibrate RGB~\nPlace a solid \nwhite surface \n~150mm away" +
                           "\nNOTE: place US {}mm under RGB".format(clearance))
         while True:
-            diff = (self.us_sensor.proximity()-clearance) - 150
+            diff = (reference_us.proximity()-clearance) - 150
             if abs(diff) < 3:
                 break
             elif diff > 0:
@@ -191,8 +201,8 @@ class Vehicle:
         animation_stage = 0
         while True:
             # get readings until we get close enough
-            us_readings.append(int(self.us_sensor.proximity()) - clearance)
-            rgb_readings.append(int(self.rgb_sensor.proximity()))
+            us_readings.append(int(reference_us.proximity()) - clearance)
+            rgb_readings.append(int(self.rgb.proximity()))
             print(us_readings[i])
             if us_readings[i] < 10:
                 break
