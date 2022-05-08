@@ -3,7 +3,7 @@ from time import sleep_us, ticks_ms, ticks_diff
 from array import array
 
 
-class Sensor:
+class UltraSonic:
     """
     A ``us_sensor`` object is used to control a HCSR04 ultrasonic sensor.
     """
@@ -14,8 +14,8 @@ class Sensor:
         - echo_pin: Input pin listens for reflection to estimate time of flight.
         """
         # Initialise constants
-        self.NUM_READINGS = 10  # CONST: number of readings to average over (denoise sensor data)
-        self.MAX_TIMEDIFF_MS = 100  # CONST: max elapsed time (ms) before self.readings is too old (therefore invalid)
+        self.NUM_READINGS = 6  # CONST: number of readings to average over (denoise sensor data)
+        self.MAX_TIMEDIFF_MS = 1000  # CONST: max elapsed time (ms) before self.readings is too old (therefore invalid)
         self.ECHO_TIMEOUT_US = int(4000*2/(340.29*1e-3))  # CONST: note 4000mm is the max reasonable range of sensor
         self.SPEED_SOUND = 340.29  # CONST: m/s, for calculating distances
 
