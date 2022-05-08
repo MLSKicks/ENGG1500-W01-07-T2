@@ -3,7 +3,7 @@
 # Encoder Support: this version should be portable between MicroPython platforms
 # Thanks to Evan Widloski for the adaptation to the machine module
 
-class Encoder(object):
+class EncoderClicker(object):
     def __init__(self, pin_left, pin_right):
         from machine import Pin
         self.left_fwd = True
