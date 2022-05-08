@@ -242,6 +242,8 @@ def main():
             # state transition
             if pid.target_met():
                 state = STATE_TURN_LEFT
+            if (not ir_l_onroad and not ir_r_onroad and rgb_onroad):
+                state = STATE_LF_FWD
 
         elif state == STATE_DRIVE_BKWD:
             # state actions
@@ -322,6 +324,7 @@ def main():
             if transition_flag:
                 pid.reset_target(100,70)
             lduty, rduty = pid.run() 
+            
             #TODO: UPDATE TURNING AUTOMATICALLY???
 
             # state transition
