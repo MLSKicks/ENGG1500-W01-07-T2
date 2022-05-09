@@ -196,9 +196,7 @@ def main():
     STATE_PRINT_IR = 5
     STATE_IDLE = 6
     STATE_HELP = 7
-    STATE_LF_FWD = 8
-    STATE_LF_TURN_LEFT = 9
-    STATE_LF_TURN_RIGHT = 10
+    STATE_LF = 8
 
     # initial state
     prev_state = STATE_NULL
@@ -243,7 +241,7 @@ def main():
             if pid.target_met():
                 state = STATE_TURN_LEFT
             if (not ir_l_onroad and not ir_r_onroad and rgb_onroad):
-                state = STATE_LF_FWD
+                state = STATE_LF
 
         elif state == STATE_DRIVE_BKWD:
             # state actions
@@ -290,48 +288,24 @@ def main():
             lduty, rduty = 0, 0
             if ir_l_onroad:
                 state = STATE_PRINT_ART
-
-        elif state == STATE_LF_FWD:
+                
+        #TODO: NICH TEST PLS
+        elif state == STATE_LF:
             # state actions
             screen.print("State: IR FORWARD")
             if transition_flag or pid.target_met:
-                pid.reset_target(100, 100)
+                if not ir_l_onroad and not ir_r_onroad:
+                    pid.reset_target(100,100)
+                elif ir_l_onroad and not ir_r_onroad:
+                    pid.reset_target(90,60)
+                elif not ir_l_onroad and ir_r_onroad:
+                    pid.reset_target(60,90)       
             lduty, rduty = pid.run()
-            # state transition
-            if ir_l_onroad and not ir_r_onroad and rgb_onroad:
-                state = STATE_LF_TURN_LEFT
-            if not ir_l_onroad and ir_r_onroad and rgb_onroad:
-                state = STATE_LF_TURN_RIGHT
-
-        elif state == STATE_LF_TURN_LEFT:
-            # state actions
-            screen.print("State: IR TURN LEFT")
-            if transition_flag:
-                pid.reset_target(70,100)
-            lduty, rduty = pid.run() 
-
-            #TODO: UPDATE TURNING AUTOMATICALLY???
 
             # state transition
-            if (not ir_l_onroad and not ir_r_onroad and rgb_onroad) or pid.target_met:
-                state = STATE_LF_FWD
-            if not ir_l_onroad and ir_r_onroad and rgb_onroad:
-                state = STATE_LF_TURN_RIGHT
-
-        elif state == STATE_LF_TURN_RIGHT:
-            # state actions
-            screen.print("State: IR TURN RIGHT")
-            if transition_flag:
-                pid.reset_target(100,70)
-            lduty, rduty = pid.run() 
+            if ir_l_onroad and ir_r_onroad:
+                state = STATE_IDLE
             
-            #TODO: UPDATE TURNING AUTOMATICALLY???
-
-            # state transition
-            if (not ir_l_onroad and not ir_r_onroad and rgb_onroad) or pid.target_met:
-                state = STATE_LF_FWD
-            if ir_l_onroad and not ir_r_onroad and rgb_onroad:
-                state = STATE_LF_TURN_LEFT
 
         # control motors
         vehicle.set_motor(lduty, rduty)
@@ -370,3 +344,35 @@ if __name__ == "__main__":
 #             # state transition
 #             if pid.target_met():
 #                 state = STATE_PRINT_IR
+
+
+# mark code
+# elif state == STATE_LF_TURN_LEFT:
+#             # state actions
+#             screen.print("State: IR TURN LEFT")
+#             if transition_flag:
+#                 pid.reset_target(70,100)
+#             lduty, rduty = pid.run() 
+
+#             #TODO: UPDATE TURNING AUTOMATICALLY???
+
+#             # state transition
+#             if (not ir_l_onroad and not ir_r_onroad and rgb_onroad) or pid.target_met:
+#                 state = STATE_LF_FWD
+#             if not ir_l_onroad and ir_r_onroad and rgb_onroad:
+#                 state = STATE_LF_TURN_RIGHT
+
+#         elif state == STATE_LF_TURN_RIGHT:
+#             # state actions
+#             screen.print("State: IR TURN RIGHT")
+#             if transition_flag:
+#                 pid.reset_target(100,70)
+#             lduty, rduty = pid.run() 
+            
+#             #TODO: UPDATE TURNING AUTOMATICALLY???
+
+#             # state transition
+#             if (not ir_l_onroad and not ir_r_onroad and rgb_onroad) or pid.target_met:
+#                 state = STATE_LF_FWD
+#             if ir_l_onroad and not ir_r_onroad and rgb_onroad:
+#                 state = STATE_LF_TURN_LEFT
