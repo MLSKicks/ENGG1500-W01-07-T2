@@ -52,6 +52,7 @@ class RGB:
         self.R_ADJUSTMENT = 0
         self.G_ADJUSTMENT = 0
         self.B_ADJUSTMENT = 0
+        self.road_sensitivity = 100 # below this value is road
 
     def proximity_mm(self):
         """WARNING: only reliable for distances <= 50"""
@@ -109,6 +110,18 @@ class RGB:
         """return blue light level"""
         return self.apds9960.als.blueLightLevel + self.B_ADJUSTMENT
 
+    def set_road_sensitivity(self, sensitivity):
+        self.road_sensitivity = sensitivity
+
+    def get_road_sensitivity(self):
+        return self.road_sensitivity
+
     def is_on_road(self):
-        # TODO: NICH MAKE THIS SEE BLACK
-        return True
+        if self.ambient() < self.road_sensitivity:
+            return True
+        return False
+
+    def is_on_road_by_prox(self):
+        if self.proximity() <= 1:
+            return True
+        return False
