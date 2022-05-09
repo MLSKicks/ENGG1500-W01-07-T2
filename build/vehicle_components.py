@@ -9,6 +9,8 @@ from ir_sensor import InfraRed
 from encoder import EncoderClicker
 import motor
 import pid_control
+from pid_control import clicks_to_mm
+
 
 # - - - - - - - - - - - - - - - - - - - - DEBUG PRINTING - - - - - - - - - - - - - - - - - - - - #
 def print_device_info(devices):
@@ -48,6 +50,7 @@ class Vehicle:
             self.screen = oled_screen.Screen(self.i2c_bus)
         if self.init_rgb:
             self.rgb = RGB(self.i2c_bus)
+            self.get_calibration_rgb_road()
 
         # initialise sensors
         if self.init_us_l:
@@ -103,6 +106,115 @@ class Vehicle:
             sleep_ms(self.SENSOR_SLEEP_MS)
 
     # - - - - - - - - - - - - - - - - - - - - CALIBRATION ROUTINES - - - - - - - - - - - - - - - - - - - - #
+    def motor_calibration(self):
+        f = open('motor.txt', 'w')
+        f.write('speed,offset\n')
+        for speed in range(40, 90, 2):
+            # get up to speed
+            self.screen.print("~MotorCalibrate~\n\nSpeed {}".format(speed))
+            self.set_motor(0, 0)
+            sleep_ms(3000)
+            self.set_motor(speed, speed)
+            sleep_ms(500)
+
+            # our reference motor is the left motor -> increase/decrease right motor until it matches
+            tolerance = 3
+            offset = 0
+            while True:
+                # travel up to 500mm so we get an error value
+                self.screen.print("~MotorCalibrate~\n\nSpeed {}\nOffset {}\nclk_l {}\nclk_r {}".format(
+                    speed, offset, self.encoder.get_left(), self.encoder.get_right()))
+
+                self.encoder.clear_count()
+                self.set_motor(speed-offset, speed+offset)
+                while clicks_to_mm(self.encoder.get_left()) < 500:
+                    self.screen.print("~MotorCalibrate~\n\nSpeed {}\nOffset {}\nclk_l {}\nclk_r {}".format(
+                        speed, offset, self.encoder.get_left(), self.encoder.get_right()))
+
+                # check what the error we got was
+                error = self.encoder.get_left() - self.encoder.get_right()
+                if abs(error) < tolerance:   # if error is small enough, we found our target offset!
+                    break
+                elif error > 0:              # for a positive error -> increase right motor
+                    offset += 1
+                else:                        # for a negative error -> decrease right motor
+                    offset -= 1
+            f.write('{},{}\n'.format(speed, offset))
+        f.close()
+
+    def get_calibration_rgb_road(self):
+        try:
+            f = open('rgb_road.txt', 'r')
+            self.rgb.set_road_sensitivity(int(f.read()))
+            f.close()
+        except OSError:
+            f = open('rgb_road.txt', 'w')
+            self.calibrate_rgb_road()
+            f.write(str(self.rgb.get_road_sensitivity()))
+            f.close()
+        except ValueError:
+            os.remove('rgb_road.txt',)
+            f = open('rgb_road.txt', 'w')
+            self.calibrate_rgb_road()
+            f.write(str(self.rgb.get_road_sensitivity()))
+            f.close()
+
+    def calibrate_rgb_road(self):
+        """Calibrates the RGB Sensor to distinguish between road and off-road surfaces"""
+        self.screen.print("~CalibrateRGB~\nPosition RGB on\nthe ROAD surface")
+        for i in range(5, 0, -1):  # countdown
+            self.screen.fill_rect(0, 7, 16, 1, 0)  # clear old msg
+            self.screen.print_unformatted("Measuring in " + str(i), 1, 7)
+            sleep_ms(1000)
+
+        self.screen.fill_rect(0, 7, 16, 1, 0)  # clear old msg
+        road_readings = []
+        animation_stage = 0
+        for i in range(0, 12, 1):
+            # get reading
+            road_readings.append(self.rgb.ambient())
+            # every 3 loops update animation
+            if i % 3 == 0:
+                self.screen.fill_rect(5, 6, 6, 1, 0)  # clear old animation
+                self.screen.print_unformatted(". " * animation_stage, 5, 6)
+                animation_stage = (animation_stage + 1) % 4  # loop animation
+            # delay
+            sleep_ms(150)
+
+        self.screen.print("~CalibrateRGB~\nPosition RGB on\nthe OFF-ROAD surface")
+        for i in range(5, 0, -1):  # countdown
+            self.screen.fill_rect(0, 7, 16, 1, 0)  # clear old msg
+            self.screen.print_unformatted("Measuring in " + str(i), 1, 7)
+            sleep_ms(1000)
+
+        self.screen.fill_rect(0, 7, 16, 1, 0)  # clear old msg
+        animation_stage = 0
+        off_road_readings = []
+        for i in range(0, 12, 1):
+            # get reading
+            off_road_readings.append(self.rgb.ambient())
+            # every 3 loops update animation
+            if i % 3 == 0:
+                self.screen.fill_rect(5, 6, 6, 1, 0)  # clear old animation
+                self.screen.print_unformatted(". " * animation_stage, 5, 6)
+                animation_stage = (animation_stage + 1) % 4  # loop animation
+            # delay
+            sleep_ms(150)
+
+        # calculate sensitivity threshold as in between road and off-road readings
+        road = min(road_readings)
+        print(road)
+        off_road = max(off_road_readings)
+        print(off_road)
+        if road < off_road:  # our readings are good
+            sensitivity = int((road + off_road) / 2)
+            print(sensitivity)
+            self.rgb.set_road_sensitivity(sensitivity)
+        else:  # let's try again since we didn't get a clear distinction
+            self.screen.print("~CalibrateRGB~\nError: unclear distinction between road and off-road. Retry!")
+            sleep_ms(2000)
+            self.calibrate_rgb_road()
+
     def get_calibration_ir(self, ir_str, ir_letter, ir):
         try:
             f = open(ir_str, 'r')

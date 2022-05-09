@@ -24,7 +24,7 @@ def clamp(duty, max_duty, min_duty):
 
 
 class PIDController:
-    def __init__(self, encoder, target_mm_left=0, target_mm_right=0, kp=2, ki=0.00015, kd=1):
+    def __init__(self, encoder, target_mm_left=0, target_mm_right=0, kp=1.15, ki=0.0001, kd=10):
         """initialise all PID controller constants, variables, and encoder object"""
         # initialise target and encoder object
         self.target_clicks_left = mm_to_clicks(target_mm_left)
@@ -47,6 +47,7 @@ class PIDController:
         self.proportional_left, self.proportional_right = 0, 0
         self.integral_left, self.integral_right = 0, 0
         self.derivative_left, self.derivative_right = 0, 0
+        self.overshoot_left, self.overshoot_right = 0, 0
         self.duty_left, self.duty_right = 0, 0
 
         self.t0 = ticks_ms()
@@ -59,13 +60,13 @@ class PIDController:
         self.KD = kd  # motor_duty is proportional to (projected click error * KD)
 
         # clamp and bias constants
-        self.min_duty_trim = 20  # anything between -20pwm to +20pwm doesn't move; so add this to all duties
-        self.max_duty = 55  # effective max is min_duty_trim + max_duty = 75
-        self.min_duty = -55  # effective min is -min_duty_trim + min_duty = -75
-        self.max_integral = 20
-        self.min_integral = -20
-        self.max_bias = 12
-        self.min_bias = -12
+        self.min_duty_trim = 30  # anything between -35pwm to +35pwm doesn't move; so add this to all duties
+        self.max_duty = 45  # effective max is min_duty_trim + max_duty = 75
+        self.min_duty = -45  # effective min is -min_duty_trim + min_duty = -75
+        self.max_integral = 10
+        self.min_integral = -10
+        self.max_overshoot = 8
+        self.bias = 3
 
         # proportional on measurement (clicks input) option
         self.p_on_m = False
@@ -110,27 +111,23 @@ class PIDController:
     def duty_correction(self):
         """First correction: Add a trim to the duties because there is a portion of duty between
         25 and -25 that effectively does nothing, creating noise in our PID system.
-        Second correction: Reactively fix the bias in the motors.
+        Second correction: Fixed bias to correct the motor inbalance.
         Note: a positive bias means we need to increase power to the right motor,
         and decrease power to the left motor"""
         # trim correction
         if self.duty_left > 0:
             self.duty_left += self.min_duty_trim
-        else:
+        elif self.duty_left < 0:
             self.duty_left -= self.min_duty_trim
+        # else if duty == 0, leave it alone
 
         if self.duty_right > 0:
             self.duty_right += self.min_duty_trim
-        else:
+        elif self.duty_right < 0:
             self.duty_right -= self.min_duty_trim
+        # else if duty == 0, leave it alone
 
-        # bias correction IF attempting to travel straight
-        bias = 0
-        if abs(self.target_clicks_left - self.target_clicks_right) <= 5:
-            scale_factor = 1.5
-            bias = clamp((self.error_right - self.error_left) * scale_factor, self.max_bias, self.min_bias)
-
-        return int(self.duty_left - bias), int(self.duty_right + bias)
+        return int(self.duty_left - self.bias), int(self.duty_right + self.bias)
 
     def proportional(self):
         """Calculates the proportional part of PID control"""
@@ -152,9 +149,6 @@ class PIDController:
         """Calculates the derivative (projected error) part of PID control"""
         if self.dt != 0:  # save us from math errors
             if self.d_on_o:  # predictive calculation of derivative based on output (motor duty)
-                # old non-predictive way results in spikey motion due to it interfering with itself
-                # # # # self.derivative_left = self.KD * (self.duty_left - self.prev_duty_left) / self.dt
-                # # # # self.derivative_right = self.KD * (self.duty_right - self.prev_duty_right) / self.dt
                 self.derivative_left = self.KD * (self.proportional_left + self.derivative_left -
                                                   self.duty_left) / self.dt
                 self.derivative_right = self.KD * (self.proportional_right + self.derivative_right -
@@ -162,9 +156,25 @@ class PIDController:
             else:  # calculate derivative on errors (normal method)
                 self.derivative_left = self.KD * (self.error_left - self.prev_error_left) / self.dt
                 self.derivative_right = self.KD * (self.error_right - self.prev_error_right) / self.dt
-
         else:
             self.derivative_left, self.derivative_right = 0, 0
+
+    def overshoot_reduction(self):
+        """If error is within 10% of target, lets start slowing down! This 'slow down' amount
+        is proportional to the target. So with a big target, we need to slow down more at the end!
+
+        Update: 'slow down' amount is achieved by removing integral and derivative terms"""
+        self.overshoot_right, self.overshoot_left = 0, 0
+
+        if abs(self.click_left) >= abs(0.7*self.target_clicks_left):
+            self.overshoot_left = clamp(0.4*self.target_clicks_left, self.max_overshoot, -self.max_overshoot)
+            self.integral_left = 0
+            print("overshoot_left = {}".format(self.overshoot_left))
+
+        if abs(self.click_right) >= abs(0.7*self.target_clicks_right):
+            self.overshoot_right = clamp(0.4*self.target_clicks_right, self.max_overshoot, -self.max_overshoot)
+            self.integral_right = 0
+            print("overshoot_right = {}".format(self.overshoot_right))
 
     def update_elapsed_time(self):
         """Calculates the elapsed time, dt, since the last call. Also resets self.t0"""
@@ -189,10 +199,11 @@ class PIDController:
         self.proportional()
         self.integral()
         self.derivative()
+        # self.overshoot_reduction()
 
         # calculate duties
-        self.duty_left = self.proportional_left + self.integral_left - self.derivative_left
-        self.duty_right = self.proportional_right + self.integral_right - self.derivative_right
+        self.duty_left = self.proportional_left + self.integral_left - self.derivative_left - self.overshoot_left
+        self.duty_right = self.proportional_right + self.integral_right - self.derivative_right - self.overshoot_right
         self.duty_left = clamp(self.duty_left, self.max_duty, self.min_duty)
         self.duty_right = clamp(self.duty_right, self.max_duty, self.min_duty)
 
