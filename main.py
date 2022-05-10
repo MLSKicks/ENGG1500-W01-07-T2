@@ -1,44 +1,83 @@
 from vehicle_components import Vehicle
 from time import sleep_ms
 
-
-def test_pid(target_mm_l, target_mm_r, kp, ki, kd, loops=30, sleep=50):
-    """Test different proportionality constants for pid"""
-    vehicle = Vehicle(screen=True, ir_l=True, enc=True, motor=True)
-    vehicle.pid.reset(target_mm_l, target_mm_r, kp, ki, kd)
-    for i in range(0, loops):
-        vehicle.set_motor(*vehicle.pid.run())
-        sleep_ms(sleep)
-    vehicle.set_motor(0, 0)
-
+# - - - - - - - - - - - - - - - - - - - - - - - RANDOM STUFF - - - - - - - - - - - - - - - - - - - - - - - - - -#
+ascii_cat = ("State: PRINT_ART\n\n    _,,/|\n"
+             "    \\o o'\n"
+             "    =_~_=\n"
+             "    /   \\ (\\\n"
+             "   (////_)//\n"
+             "   ~~~")
 
 # - - - - - - - - - - - - - - - - - - - - - - - STATE ENUMERATION - - - - - - - - - - - - - - - - - - - - - - - #
-STATE_NULL = -1
-STATE_PRINT_ART = 0
-STATE_DRIVE_FWD = 1
-STATE_DRIVE_BKWD = 2
-STATE_TURN_LEFT = 3
-STATE_TURN_RIGHT = 4
-STATE_PRINT_ROAD = 5
-STATE_IDLE = 6
-STATE_STOP = 7
-STATE_LF_FWD = 8
-STATE_LF_TURN_LEFT = 9
-STATE_LF_TURN_RIGHT = 10
+NULL = -1
+SPLASH_SCREEN = 0
+PRINT_ROAD_INFO = 1
+IDLE = 2
+STOP = 3
+HAZARD = 4
+LF_FWD = 5
+LF_TURN_LEFT = 6
+LF_TURN_RIGHT = 7
+
+# - - - - - - - - - - - - - - - - - - - - - - - STATE VARIABLES - - - - - - - - - - - - - - - - - - - - - - - - #
+prev_state = NULL
+state = NULL
+is_transition = False
 
 
-def main(initial_state = -1):
+def update_state_variables():
+    """Updates our previous state (prev_state) variable and transition flag (is_transition).
+    The transition flag tells us if we have just transitioned to a new state. This is helpful
+    in running a piece of code in a state one and once only."""
+    global prev_state, state, is_transition
+
+    is_transition = prev_state != state
+    prev_state = state
+
+
+def print_state(screen):
+    """Print out what state we are in"""
+    global state
+
+    if state == NULL:
+        screen.print("State: NULL\nNo initial state\nwas specified!")
+    elif state == SPLASH_SCREEN:
+        screen.print_art(ascii_cat)
+    elif state == PRINT_ROAD_INFO:
+        screen.print("State: Road Info\n")
+    elif state == IDLE:
+        screen.print("State: Idling\nI am lost!")
+    elif state == STOP:
+        screen.print("State: Stopped\nMy job is done!")
+    elif state == HAZARD:
+        screen.print("State: Hazard\nSomething got in\n my way!")
+    elif state == LF_FWD:
+        screen.print("State: Line Foll\n-owing")
+    elif state == LF_TURN_LEFT:
+        screen.print("State: Line Foll\n-owing LEFT")
+    elif state == LF_TURN_RIGHT:
+        screen.print("State: Line Foll\n-owing RIGHT")
+
+
+def main(initial_state=STATE_NULL):
+    """This is our main state machine: a big loop that performs actions based on the current state!
+
+    Initialisation: initialise our Vehicle object which initialises objects for each sensor, controller, etc.
+
+    Sensor Data Collection: collect data from all our sensors
+
+    Global Transitions: these are IMPORTANT TRANSITIONS which can overwrite anything. They are important as they
+    are reacting to things like obstacles on the road, in which case we want to stop ASAP!
+
+    State Machine Body: goes through all the nitty-gritty details """
+    global prev_state, state, is_transition, ascii_cat
+
     # - - - - - - - - - - - - - - - - - - - - - - - INITIALISATION - - - - - - - - - - - - - - - - - - - - - - - #
     vehicle = Vehicle(motor=True, enc=True, screen=True, rgb=True, ir_l=True, ir_r=True, us_l=True, us_r=True)
-    pid = vehicle.pid
-    screen = vehicle.screen
-
-    # - - - - - - - - - - - - - - - - - - - - - - - INITIAL STATE- - - - - - - - - - - - - - - - - - - - - - - #
-    prev_state = STATE_NULL
-    state = initial_state
-    lduty = 0
-    rduty = 0
-    idle_timeout = 0
+    pid = vehicle.pid          # PID-control object -> sets motor duties to achieve desired targets
+    screen = vehicle.screen    # OLED screen object -> print useful information
+    state = initial_state      # Set the requested initial state
 
     while True:
         # - - - - - - - - - - - - - - - - - - - - SENSOR DATA COLLECTION - - - - - - - - - - - - - - - - - - #
@@ -50,54 +89,24 @@ def main(initial_state = -1):
         rgb_prox = vehicle.rgb.proximity_mm()
         us_l = vehicle.us_l.proximity()
         us_r = vehicle.us_r.proximity()
-        print("us-l = {}, us-r = {}".format(us_l, us_r))
-        # - - - - - - - - - - - - - - - - - - - - GLOBAL TRANSITIONS - - - - - - - - - - - - - - - - - - - - #
-        # if us_l < 15 and us_r < 15:
-        #     state = STATE_STOP
-        if rgb_prox < 35:  # something is probably on the road... so lets stop
-            state = STATE_STOP
 
-        # set transition flag and update prev state (this tells us if we just transitioned, don't worry about it...)
-        transition_flag = prev_state != state
-        prev_state = state
+        # - - - - - - - - - - - - - - - - - - - - GLOBAL TRANSITIONS - - - - - - - - - - - - - - - - - - - - #
+        if rgb_prox < 35:  # Something is on the road or obstructing the sensor... so lets stop
+            state = HAZARD
+
+        # - - - - - - - - - - - - - - - - - - - - STATE MACHINE HEADER - - - - - - - - - - - - - - - - - - - #
+        update_state_variables()
+        print_state(screen)
 
         # - - - - - - - - - - - - - - - - - - - - STATE MACHINE BODY - - - - - - - - - - - - - - - - - - - - #
-        if state == STATE_PRINT_ART:
-            # state actions
-            screen.print_ascii_art(
-                "State: PRINT_ART\n\n    _,,/|\n    \\o o'\n    =_~_=\n    /   \\ (\\\n   (////_)//\n   ~~~")
-            lduty, rduty = 0, 0
-            sleep_ms(1000)
+        if state == SPLASH_SCREEN:
+            pid.set_target(0, 0)
             # state transition
             state = STATE_DRIVE_FWD
 
-        elif state == STATE_DRIVE_FWD:
+        elif state == PRINT_ROAD_INFO:
             # state actions
-            screen.print("State: DRIVE_FWD")
-            if transition_flag:
-                pid.reset_target(100, 100)
-            lduty, rduty = pid.run()
-
-            # state transition
-            if pid.target_met():
-                state = STATE_TURN_LEFT
-            if not ir_l_onroad and not ir_r_onroad and rgb_onroad:
-                state = STATE_LF_FWD
-
-        elif state == STATE_DRIVE_BKWD:
-            # state actions
-            screen.print("State: DRIVE_BKWD")
-            if transition_flag:
-                pid.reset_target(-100, -100)
-            lduty, rduty = pid.run()
-
-            # state transition
-            if pid.target_met():
-                state = STATE_TURN_RIGHT
-
-        elif state == STATE_PRINT_ROAD:
-            # state actions
-            screen.print("State: PRINT_IR\n\nIR-L_Road={}\nIR-R_Road={}\nRGB_Road={}\nAmb={}\nHue={}\nProx={}".format(
+            screen.print_unformatted("IR-L_Road={}\nIR-R_Road={}\nRGB_Road={}\nAmb={}\nHue={}\nProx={}".format(
                 ir_l_onroad, ir_r_onroad, rgb_onroad, ambient, rgb_hue, rgb_prox))
             lduty, rduty = 0, 0
             sleep_ms(250)
@@ -139,50 +148,22 @@ def main(initial_state = -1):
                 pid.add_target(15, -15)
 
             lduty, rduty = pid.run()
-            #
-            # # state transition
-            # if ir_l_onroad and not ir_r_onroad and not rgb_onroad:  # veered even further right
-            #     state = STATE_LF_TURN_LEFT
-            # if not ir_l_onroad and ir_r_onroad and not rgb_onroad:  # veered even further left
-            #     state = STATE_LF_TURN_RIGHT
-
-        elif state == STATE_LF_TURN_LEFT:
-            # state actions
-            screen.print("State: LF_TURN_LEFT")
-            lduty, rduty = 0, 0
-            # if transition_flag:
-            #     pid.reset_target(70, 100)
-            # lduty, rduty = pid.run()
-            #
-            # # TODO: UPDATE TURNING AUTOMATICALLY???
-            #
-            # # state transition
-            # if (not ir_l_onroad and not ir_r_onroad and rgb_onroad) or pid.target_met:
-            #     state = STATE_LF_FWD
-            # if not ir_l_onroad and ir_r_onroad and rgb_onroad:
-            #     state = STATE_LF_TURN_RIGHT
-
-        elif state == STATE_LF_TURN_RIGHT:
-            # state actions
-            screen.print("State: LF_TURN_RIGHT")
-            lduty, rduty = 0, 0
-            # if transition_flag:
-            #     pid.reset_target(100, 70)
-            # lduty, rduty = pid.run()
-            #
-            # # TODO: UPDATE TURNING AUTOMATICALLY???
-            #
-            # # state transition
-            # if (not ir_l_onroad and not ir_r_onroad and rgb_onroad) or pid.target_met:
-            #     state = STATE_LF_FWD
-            # if ir_l_onroad and not ir_r_onroad and rgb_onroad:
-            #     state = STATE_LF_TURN_LEFT
 
         # - - - - - - - - - - - - - - - - - - - - CONTROL MOTORS - - - - - - - - - - - - - - - - - - - - #
         vehicle.set_motor(lduty, rduty)
 
 
-def pid_run(vehicle, left_target, right_target, n=1):
+def test_pid(target_mm_l, target_mm_r, kp, ki, kd, loops=30, sleep=50):
+    """Test different proportionality constants for pid"""
+    vehicle = Vehicle(screen=True, ir_l=True, enc=True, motor=True)
+    vehicle.pid.reset(target_mm_l, target_mm_r, kp, ki, kd)
+    for i in range(0, loops):
+        vehicle.set_motor(*vehicle.pid.run())
+        sleep_ms(sleep)
+    vehicle.set_motor(0, 0)
+
+
+def run_pid(vehicle, left_target, right_target, n=1):
     # divide the targets into n steps or segments
     left_target_step = left_target/n
     right_target_step = right_target/n
@@ -202,22 +183,22 @@ def pid_run(vehicle, left_target, right_target, n=1):
     vehicle.set_motor(0, 0)
 
 
-def pid_gentle_curve(direction_is_left):
+def gentle_curve(turn_left=False, turn_right=False):
     vehicle = Vehicle(motor=True, enc=True, screen=True)
     # direction True = turn left
-    if direction_is_left:
+    if turn_left:
         vehicle.screen.print("Gentle Curve\n\nTurning left")
-        pid_run(vehicle, 300, 500, 3)
+        run_pid(vehicle, 300, 500, 3)
 
     # direction False = turn right
-    else:
+    if turn_right:
         vehicle.screen.print("Gentle Curve\n\nTurning right")
-        pid_run(vehicle, 500, 300, 3)
+        run_pid(vehicle, 500, 300, 3)
 
     vehicle.screen.print("Done :)")
 
 
-def pid_roundabout(about_exit):
+def roundabout(about_exit):
     # exit must be between 0 - 3: 0 is uturn, 1 is left, 2 is fwd, 3 is right
     about_exit = (about_exit % 4)
     if about_exit == 0:
@@ -226,8 +207,8 @@ def pid_roundabout(about_exit):
 
     # travel onto roundabout
     vehicle.screen.print("Round About\n\nGetting on")
-    pid_run(vehicle, 40, 40)
-    pid_run(vehicle, -80, 80)
+    run_pid(vehicle, 40, 40)
+    run_pid(vehicle, -80, 80)
 
     for i in range(0, about_exit, 1):
         # complete the quarter turn
@@ -236,17 +217,17 @@ def pid_roundabout(about_exit):
 
     # travel off roundabout
     vehicle.screen.print("Round About\n\nGetting off")
-    pid_run(vehicle, -90, 90)
+    run_pid(vehicle, -90, 90)
 
     vehicle.screen.print("Done :)")
 
 
 if __name__ == "__main__":
     sleep_ms(500)
-    pid_roundabout(2)
+    roundabout(2)
 
     sleep_ms(2000)
-    pid_gentle_curve(False)
+    gentle_curve(turn_right=True)
 
     sleep_ms(2000)
     main(STATE_LF_FWD)

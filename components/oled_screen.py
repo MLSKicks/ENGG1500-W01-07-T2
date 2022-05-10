@@ -38,6 +38,10 @@ class Screen:
         self.oled.text(message, col*_CHAR_WIDTH, row*_CHAR_HEIGHT, colour)
         self.oled.show()
 
+    def print_variable_(self, message, col, row):
+        """Print a message in a space that must be cleared first."""
+        self.oled.fill_rect(col, row, len(message), 1)
+
     def print(self, message):
         """
             Fits a message onto the screen by breaking words apart without mercy.
@@ -70,7 +74,7 @@ class Screen:
         self.oled.text(cur_line, 0, row*_CHAR_HEIGHT)
         self.oled.show()
 
-    def print_ascii_art(self, message):
+    def print_art(self, message):
         """
             Same as print but preserves whitespace
             :type message: str
