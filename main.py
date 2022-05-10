@@ -2,17 +2,12 @@ from vehicle_components import Vehicle
 from time import sleep_ms
 
 
-def run_pid_test(target_mm_l, target_mm_r, kp, ki, kd, loops=30, sleep=50):
+def test_pid(target_mm_l, target_mm_r, kp, ki, kd, loops=30, sleep=50):
     """Test different proportionality constants for pid"""
     vehicle = Vehicle(screen=True, ir_l=True, enc=True, motor=True)
-    pid = vehicle.pid
-    pid.reset(target_mm_l, target_mm_r, kp, ki, kd)
-    sleep_ms(65)
-    for i in range(0, loops, 1):
-        lduty, rduty = pid.run()
-        vehicle.set_motor(lduty, rduty)
-        vehicle.screen.print("i={}\nlduty={}\nrduty={}\nir_road={}".format(i, lduty, rduty,
-                                                                           vehicle.ir_l.is_on_road()))
+    vehicle.pid.reset(target_mm_l, target_mm_r, kp, ki, kd)
+    for i in range(0, loops):
+        vehicle.set_motor(*vehicle.pid.run())
         sleep_ms(sleep)
     vehicle.set_motor(0, 0)
 
