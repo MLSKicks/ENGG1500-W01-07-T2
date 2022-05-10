@@ -25,7 +25,9 @@ class Vehicle:
     # - - - - - - - - - - - - - - - - - - - - INITIALISATION - - - - - - - - - - - - - - - - - - - - #
     def __init__(self, init_screen=False, init_rgb=False, init_us_l=False, init_us_r=False,
                  init_ir_l=False, init_ir_r=False, init_encoder=False, init_motor=False):
-        """Sets up oled display and rgb sensor on I2C channel 0, sda=Pin(12), scl=Pin(13)."""
+        """This is basically a big interface class. It initialises all devices and components that are
+        requested, calibrating them if not already calibrated."""
+        # Hold on to the flags containing what we wanted to initialise
         self.init_screen = init_screen
         self.init_rgb = init_rgb
         self.init_us_l = init_us_l
@@ -35,12 +37,12 @@ class Vehicle:
         self.init_encoder = init_encoder
         self.init_motor = init_motor
 
-        # initialise motor
+        # Initialise motor
         if self.init_motor:
             self.left_motor = motor.Motor("left", 8, 9, 6)
             self.right_motor = motor.Motor("right", 10, 11, 7)
 
-        # initialise i2c devices
+        # Initialise i2c devices
         if self.init_screen or self.init_rgb:
             self.i2c_bus = I2C(0, sda=Pin(12), scl=Pin(13))
             print_device_info(self.i2c_bus.scan())  # print debugging info
@@ -50,7 +52,7 @@ class Vehicle:
             self.rgb = RGB(self.i2c_bus)
             self.get_calibration_rgb_road()
 
-        # initialise sensors
+        # Initialise sensors
         if self.init_us_l:
             self.us_l = UltraSonic(trig=3, echo=2)
         if self.init_us_r:
@@ -65,36 +67,39 @@ class Vehicle:
             self.encoder = EncoderClicker(19, 18)  # ENC_L corresponds to MOTOR_RIGHT so have to swap pin order!
             self.pid = PIDController(self.encoder)
 
-        # initialise constants
-        self.SENSOR_SLEEP_MS = 10
+        # Initialise constants
+        self.SENSOR_SLEEP_MS = 10  # tells us how long to sleep before taking a new reading in update_sleep(ms)
 
     # - - - - - - - - - - - - - - - - - - - - GENERAL FUNCTIONS - - - - - - - - - - - - - - - - - - - - #
     def set_motor(self, lduty, rduty):
-        """function to quickly set both motor values
+        """Set motor duties. This function safely clamps the duties to values between -100 to 100
             :type: lduty: int
             :type: rduty: int"""
-        # sanitise input (0 <= left duty & right duty <= 100)
+        # Sanitise input (0 <= left duty && right duty <= 100)
         lduty = min(lduty, 100)
         rduty = min(rduty, 100)
         lduty = max(lduty, -100)
         rduty = max(rduty, -100)
 
-        # a negative duty means rotate backwards
-        if lduty > 0:
+        # Set left motor
+        if lduty >= 0:
             self.left_motor.set_forwards()
             self.left_motor.duty(lduty)
-        else:
+        else:  # Negative duty -> rotate backwards
             self.left_motor.set_backwards()
             self.left_motor.duty(lduty * -1)
-        if rduty > 0:
+        # Set right motor
+        if rduty >= 0:
             self.right_motor.set_forwards()
             self.right_motor.duty(rduty)
-        else:
+        else:  # Negative duty -> rotate backwards
             self.right_motor.set_backwards()
             self.right_motor.duty(rduty * -1)
 
     def update_sleep(self, milliseconds):
-        """Sleeps for a time (ms) while maintaining sensor readings"""
+        """Sleeps for a time (ms) while maintaining sensor readings. Important
+        for the ultrasonic sensors which average over multiple readings (i.e. we can't
+        just take a reading at one instantaneous time)"""
         t0 = ticks_ms()
         while ticks_diff(ticks_ms(), t0) < milliseconds:
             if self.init_us_l:
@@ -105,6 +110,7 @@ class Vehicle:
 
     # - - - - - - - - - - - - - - - - - - - - CALIBRATION ROUTINES - - - - - - - - - - - - - - - - - - - - #
     def motor_calibration(self):
+        """Routine for testing the difference in speed between the left and right motors at different duties"""
         f = open('motor.txt', 'w')
         f.write('speed,offset\n')
         for speed in range(40, 90, 2):
@@ -141,6 +147,7 @@ class Vehicle:
         f.close()
 
     def get_calibration_rgb_road(self):
+        """Routine for reading the current calibration for the rgb sensor"""
         try:
             f = open('rgb_road.txt', 'r')
             self.rgb.set_road_sensitivity(int(f.read()))
@@ -214,6 +221,7 @@ class Vehicle:
             self.calibrate_rgb_road()
 
     def get_calibration_ir(self, ir_str, ir_letter, ir):
+        """Routine for reading the current calibration for the ir sensors"""
         try:
             f = open(ir_str, 'r')
             ir.set_sensitivity(int(f.read()))
