@@ -3,6 +3,7 @@ from time import sleep_ms
 
 
 def run_pid_test(target_mm_l, target_mm_r, kp, ki, kd, loops=30, sleep=50):
+    """Test different proportionality constants for pid"""
     vehicle = Vehicle(init_screen=True, init_ir_l=True, init_encoder=True, init_motor=True)
     pid = vehicle.pid
     pid.reset(target_mm_l, target_mm_r, kp, ki, kd)
@@ -16,7 +17,7 @@ def run_pid_test(target_mm_l, target_mm_r, kp, ki, kd, loops=30, sleep=50):
     vehicle.set_motor(0, 0)
 
 
-# enumeration of states
+# - - - - - - - - - - - - - - - - - - - - - - - STATE ENUMERATION - - - - - - - - - - - - - - - - - - - - - - - #
 STATE_NULL = -1
 STATE_PRINT_ART = 0
 STATE_DRIVE_FWD = 1
@@ -32,13 +33,12 @@ STATE_LF_TURN_RIGHT = 10
 
 
 def main(initial_state = -1):
-    # - - - - - - - - - - - - - - - - - - - - - - - initialisation - - - - - - - - - - - - - - - - - - - - - - - #
-    vehicle = Vehicle(init_motor=True, init_encoder=True, init_screen=True, init_ir_l=True,
-                                         init_ir_r=True, init_us_l=True, init_us_r=True, init_rgb=True)
+    # - - - - - - - - - - - - - - - - - - - - - - - INITIALISATION - - - - - - - - - - - - - - - - - - - - - - - #
+    vehicle = Vehicle(motor=True, enc=True, screen=True, rgb=True, ir_l=True, ir_r=True, us_l=True, us_r=True)
     pid = vehicle.pid
     screen = vehicle.screen
 
-    # - - - - - - - - - - - - - - - - - - - - - - - initial state - - - - - - - - - - - - - - - - - - - - - - - #
+    # - - - - - - - - - - - - - - - - - - - - - - - INITIAL STATE- - - - - - - - - - - - - - - - - - - - - - - #
     prev_state = STATE_NULL
     state = initial_state
     lduty = 0
@@ -46,7 +46,7 @@ def main(initial_state = -1):
     idle_timeout = 0
 
     while True:
-        # - - - - - - - - - - - - - - - - - - - - collect sensor data - - - - - - - - - - - - - - - - - - - - #
+        # - - - - - - - - - - - - - - - - - - - - SENSOR DATA COLLECTION - - - - - - - - - - - - - - - - - - #
         ir_l_onroad = vehicle.ir_l.is_on_road()
         ir_r_onroad = vehicle.ir_r.is_on_road()
         rgb_onroad = vehicle.rgb.is_on_road_by_prox()
@@ -56,7 +56,7 @@ def main(initial_state = -1):
         us_l = vehicle.us_l.proximity()
         us_r = vehicle.us_r.proximity()
         print("us-l = {}, us-r = {}".format(us_l, us_r))
-        # - - - - - - - - - - - - - - - - - - - - global transitions - - - - - - - - - - - - - - - - - - - - #
+        # - - - - - - - - - - - - - - - - - - - - GLOBAL TRANSITIONS - - - - - - - - - - - - - - - - - - - - #
         # if us_l < 15 and us_r < 15:
         #     state = STATE_STOP
         if rgb_prox < 35:  # something is probably on the road... so lets stop
@@ -66,7 +66,7 @@ def main(initial_state = -1):
         transition_flag = prev_state != state
         prev_state = state
 
-        # - - - - - - - - - - - - - - - - - - - - state machine body - - - - - - - - - - - - - - - - - - - - #
+        # - - - - - - - - - - - - - - - - - - - - STATE MACHINE BODY - - - - - - - - - - - - - - - - - - - - #
         if state == STATE_PRINT_ART:
             # state actions
             screen.print_ascii_art(
@@ -183,7 +183,7 @@ def main(initial_state = -1):
             # if ir_l_onroad and not ir_r_onroad and rgb_onroad:
             #     state = STATE_LF_TURN_LEFT
 
-        # - - - - - - - - - - - - - - - - - - - - control motors - - - - - - - - - - - - - - - - - - - - #
+        # - - - - - - - - - - - - - - - - - - - - CONTROL MOTORS - - - - - - - - - - - - - - - - - - - - #
         vehicle.set_motor(lduty, rduty)
 
 
@@ -208,7 +208,7 @@ def pid_run(vehicle, left_target, right_target, n=1):
 
 
 def pid_gentle_curve(direction_is_left):
-    vehicle = Vehicle(init_motor=True, init_encoder=True, init_screen=True)
+    vehicle = Vehicle(motor=True, enc=True, screen=True)
     # direction True = turn left
     if direction_is_left:
         vehicle.screen.print("Gentle Curve\n\nTurning left")
@@ -227,7 +227,7 @@ def pid_roundabout(about_exit):
     about_exit = (about_exit % 4)
     if about_exit == 0:
         about_exit = 4  # make it travel all the way around
-    vehicle = Vehicle(init_motor=True, init_encoder=True, init_screen=True)
+    vehicle = Vehicle(motor=True, enc=True, screen=True)
 
     # travel onto roundabout
     vehicle.screen.print("Round About\n\nGetting on")

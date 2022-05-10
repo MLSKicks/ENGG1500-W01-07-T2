@@ -23,19 +23,18 @@ def print_device_info(devices):
 
 class Vehicle:
     # - - - - - - - - - - - - - - - - - - - - INITIALISATION - - - - - - - - - - - - - - - - - - - - #
-    def __init__(self, init_screen=False, init_rgb=False, init_us_l=False, init_us_r=False,
-                 init_ir_l=False, init_ir_r=False, init_encoder=False, init_motor=False):
+    def __init__(self, motor=False, enc=False, screen=False, rgb=False, ir_l=False, ir_r=False, us_l=False, us_r=False):
         """This is basically a big interface class. It initialises all devices and components that are
         requested, calibrating them if not already calibrated."""
         # Hold on to the flags containing what we wanted to initialise
-        self.init_screen = init_screen
-        self.init_rgb = init_rgb
-        self.init_us_l = init_us_l
-        self.init_us_r = init_us_r
-        self.init_ir_l = init_ir_l
-        self.init_ir_r = init_ir_r
-        self.init_encoder = init_encoder
-        self.init_motor = init_motor
+        self.init_motor = motor
+        self.init_encoder = enc
+        self.init_screen = screen
+        self.init_rgb = rgb
+        self.init_ir_l = ir_l
+        self.init_ir_r = ir_r
+        self.init_us_l = us_l
+        self.init_us_r = us_r
 
         # Initialise motor
         if self.init_motor:
