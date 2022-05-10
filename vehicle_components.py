@@ -6,7 +6,7 @@ from components.us_sensor import UltraSonic
 from components.ir_sensor import InfraRed
 from components.encoder import EncoderClicker
 from components import motor, oled_screen
-import pid_control
+from pid_control import PIDController
 from pid_control import clicks_to_mm
 
 
@@ -63,7 +63,7 @@ class Vehicle:
             self.get_calibration_ir('ir_r.txt', 'R', self.ir_r)
         if self.init_encoder:
             self.encoder = EncoderClicker(19, 18)  # ENC_L corresponds to MOTOR_RIGHT so have to swap pin order!
-            self.pid = pid_control.PIDController(self.encoder)
+            self.pid = PIDController(self.encoder)
 
         # initialise constants
         self.SENSOR_SLEEP_MS = 10
@@ -331,4 +331,3 @@ class Vehicle:
 
         for (us, rgb) in zip(us_readings, rgb_readings):
             print("us: {} -> rgb: {}".format(us, rgb))
-
