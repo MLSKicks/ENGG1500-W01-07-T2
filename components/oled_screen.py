@@ -1,4 +1,4 @@
-from ssd1306 import SSD1306_I2C
+from lib.ssd1306 import SSD1306_I2C
 
 
 # example use of this module:

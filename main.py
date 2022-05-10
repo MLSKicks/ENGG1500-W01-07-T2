@@ -1,5 +1,5 @@
 import vehicle_components
-from time import sleep_ms, ticks_ms, ticks_diff
+from time import sleep_ms
 
 
 def run_pid_test(target_mm_l, target_mm_r, kp, ki, kd, loops=30, sleep=50):

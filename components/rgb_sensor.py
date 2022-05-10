@@ -1,4 +1,4 @@
-from APDS9960LITE import APDS9960LITE
+from lib.APDS9960LITE import APDS9960LITE
 from math import log
 
 # example use of this module:

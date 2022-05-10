@@ -1,13 +1,11 @@
 from machine import Pin, I2C
 from time import ticks_ms, ticks_diff, sleep_ms
-from array import array
 import os
-import oled_screen
-from rgb_sensor import RGB
-from us_sensor import UltraSonic
-from ir_sensor import InfraRed
-from encoder import EncoderClicker
-import motor
+from components.rgb_sensor import RGB
+from components.us_sensor import UltraSonic
+from components.ir_sensor import InfraRed
+from components.encoder import EncoderClicker
+from components import motor, oled_screen
 import pid_control
 from pid_control import clicks_to_mm
 
