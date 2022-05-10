@@ -60,7 +60,7 @@ class RGB:
         if prox <= 1:
             return 500
         else:
-            return log((prox - 1)/255)/(-0.062)
+            return int(log((prox - 1)/255)/(-0.062))
 
     def proximity(self):
         """return proximity level"""

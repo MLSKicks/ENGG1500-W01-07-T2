@@ -51,29 +51,28 @@ class Screen:
         self.oled.show()
 
     def print(self, message):
-        """
-            Fits a message onto the screen by breaking words apart without mercy.
-            Note that print will overwrite any previous prints. Also note that a
-            message that is too long is cut off! Now has '\n' support!
-            :type message: str
-        """
+        """ TODO: These prints are taking ~100ms. Is this function too inefficient?
+        Fits a message onto the screen by breaking words apart without mercy.
+        Note that print will overwrite any previous prints. Also note that a
+        message that is too long is cut off! Now has '\n' support!
+            :type message: str"""
         self.clear()
         row = 0
         col = 0
         i = 0
         cur_line = ""
         while i < len(message):
-            if col >= _COL_SIZE:  # print each complete row and then increment to the next row
-                self.oled.text(cur_line, 0, row * _CHAR_HEIGHT)
-                row += 1
-                col = 0
-                cur_line = ""
-            elif message[i] == '\n':  # handle newlines correctly
+            if message[i] == '\n':  # handle newlines correctly
                 self.oled.text(cur_line, 0, row * _CHAR_HEIGHT)
                 row += 1
                 col = 0
                 cur_line = ""
                 i += 1
+            elif col >= _COL_SIZE:  # print each complete row and then increment to the next row
+                self.oled.text(cur_line, 0, row * _CHAR_HEIGHT)
+                row += 1
+                col = 0
+                cur_line = ""
             else:  # buffer the message
                 if (cur_line != "") or (message[i] != " "):  # skip any whitespaces beginning a newline
                     cur_line += message[i]
@@ -83,10 +82,8 @@ class Screen:
         self.oled.show()
 
     def print_art(self, message):
-        """
-            Same as print but preserves whitespace
-            :type message: str
-        """
+        """Same as print but preserves whitespace
+            :type message: str"""
         self.clear()
         row = 0
         col = 0

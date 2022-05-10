@@ -1,5 +1,5 @@
 from vehicle_components import Vehicle
-from time import sleep_ms
+from time import ticks_ms, ticks_diff, sleep_ms
 
 # - - - - - - - - - - - - - - - - - - - - - - - RANDOM STUFF - - - - - - - - - - - - - - - - - - - - - - - - - -#
 ascii_cat = ("State: PRINT_ART\n\n    _,,/|\n"
@@ -31,33 +31,33 @@ def update_state_variables():
     The transition flag tells us if we have just transitioned to a new state. This is helpful
     in running a piece of code in a state one and once only."""
     global prev_state, state, is_transition
-
     is_transition = prev_state != state
     prev_state = state
 
 
 def print_state(screen):
     """Print out what state we are in"""
-    global state
-
-    if state == NULL:
-        screen.print("State: NULL\nNo initial state\nwas specified!")
-    elif state == SPLASH_SCREEN:
-        screen.print_art(ascii_cat)
-    elif state == PRINT_ROAD_INFO:
-        screen.print("State: Road Info\n")
-    elif state == IDLE:
-        screen.print("State: Idling\nI am lost!")
-    elif state == STOP:
-        screen.print("State: Stopped\nMy job is done!")
-    elif state == HAZARD:
-        screen.print("State: Hazard\nSomething got in\n my way!")
-    elif state == LF_FWD:
-        screen.print("State: Line Foll\n-owing")
-    elif state == LF_TURN_LEFT:
-        screen.print("State: Line Foll\n-owing LEFT")
-    elif state == LF_TURN_RIGHT:
-        screen.print("State: Line Foll\n-owing RIGHT")
+    if is_transition:  # Run this ONCE when we have just entered a new state -> avoids flickering
+        if state == NULL:
+            screen.print("State: NULL\n\nNo initial state\nwas specified!")
+        elif state == SPLASH_SCREEN:
+            screen.print_art(ascii_cat)
+        elif state == PRINT_ROAD_INFO:
+            screen.print("State: Road Info")
+        elif state == IDLE:
+            screen.print("State: Idling\n\nI am lost!")
+        elif state == STOP:
+            screen.print("State: Stopped\n\nMy job is done!")
+        elif state == HAZARD:
+            screen.print("State: Hazard\n\nSomething got in\n my way!")
+        elif state == LF_FWD:
+            screen.print("State: Line Foll\n-owing")
+        elif state == LF_TURN_LEFT:
+            screen.print("State: Line Foll\n-owing LEFT")
+        elif state == LF_TURN_RIGHT:
+            screen.print("State: Line Foll\n-owing RIGHT")
+        else:
+            screen.print("State: Not Found")
 
 
 def main(initial_state=NULL):
@@ -75,8 +75,8 @@ def main(initial_state=NULL):
 
     # - - - - - - - - - - - - - - - - - - - - - - - INITIALISATION - - - - - - - - - - - - - - - - - - - - - - - #
     vehicle = Vehicle(motor=True, enc=True, screen=True, rgb=True, ir_l=True, ir_r=True, us_l=True, us_r=True)
-    pid = vehicle.pid          # PID-control object -> sets motor duties to achieve desired targets
-    screen = vehicle.screen    # OLED screen object -> print useful information
+    pid = vehicle.pid          # Get PID-control object -> can set motor duties to achieve desired targets
+    screen = vehicle.screen    # Get OLED screen object -> can print useful information
     state = initial_state      # Set the requested initial state
 
     while True:
@@ -104,15 +104,19 @@ def main(initial_state=NULL):
                 pid.set_target(0, 0)
 
         elif state == PRINT_ROAD_INFO:
-            screen.print_variable("IR-L Road={}\nIR-R_Road={}\nRGB_Road={}\nAmb={:12d}\nHue={:12d}\nProx={:11d}".format(
-                ir_l_onroad, ir_r_onroad, rgb_onroad, ambient, rgb_hue, rgb_prox))
+            screen.print_variable("IR-L Road{!s:>7}\n"
+                                  "IR-R Road{!s:>7}\n"
+                                  "RGB Road{!s:>8}\n"
+                                  "RGB Amb{:9d}\n"
+                                  "RGB Hue{:9d}\n"
+                                  "RGB Prox{:8d}".format(ir_l_onroad, ir_r_onroad, rgb_onroad, ambient, rgb_hue, rgb_prox),
+                                  0, 2)
             if is_transition:
                 pid.set_target(0, 0)
-            sleep_ms(250)
 
         elif state == IDLE:
             if is_transition or pid.target_met():
-                pid.reset_target(50, 50)
+                pid.set_target(50, 50)
 
         elif state == STOP:
             if is_transition:
@@ -120,7 +124,7 @@ def main(initial_state=NULL):
 
         elif state == LF_FWD:
             if is_transition or pid.target_met:
-                pid.reset_target(50, 50)
+                pid.set_target(50, 50)
             # Adjust for slight veers left/right off the road
             if ir_l_onroad and not ir_r_onroad:  # we have veered right
                 screen.print("State: LF_FWD\nveering right")
