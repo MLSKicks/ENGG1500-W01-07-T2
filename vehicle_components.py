@@ -5,7 +5,8 @@ from components.rgb_sensor import RGB
 from components.us_sensor import UltraSonic
 from components.ir_sensor import InfraRed
 from components.encoder import EncoderClicker
-from components import motor, oled_screen
+from components.motor import Motor
+from components.oled_screen import Screen
 from pid_control import PIDController
 from pid_control import clicks_to_mm
 
@@ -38,15 +39,15 @@ class Vehicle:
 
         # Initialise motor
         if self.init_motor:
-            self.left_motor = motor.Motor("left", 8, 9, 6)
-            self.right_motor = motor.Motor("right", 10, 11, 7)
+            self.left_motor = Motor("left", 8, 9, 6)
+            self.right_motor = Motor("right", 10, 11, 7)
 
         # Initialise i2c devices
         if self.init_screen or self.init_rgb:
             self.i2c_bus = I2C(0, sda=Pin(12), scl=Pin(13))
             print_device_info(self.i2c_bus.scan())  # print debugging info
         if self.init_screen:
-            self.screen = oled_screen.Screen(self.i2c_bus)
+            self.screen = Screen(self.i2c_bus)
         if self.init_rgb:
             self.rgb = RGB(self.i2c_bus)
             self.get_calibration_rgb_road()

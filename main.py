@@ -4,7 +4,7 @@ from time import sleep_ms
 
 def run_pid_test(target_mm_l, target_mm_r, kp, ki, kd, loops=30, sleep=50):
     """Test different proportionality constants for pid"""
-    vehicle = Vehicle(init_screen=True, init_ir_l=True, init_encoder=True, init_motor=True)
+    vehicle = Vehicle(screen=True, ir_l=True, enc=True, motor=True)
     pid = vehicle.pid
     pid.reset(target_mm_l, target_mm_r, kp, ki, kd)
     sleep_ms(65)
