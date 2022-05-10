@@ -38,9 +38,16 @@ class Screen:
         self.oled.text(message, col*_CHAR_WIDTH, row*_CHAR_HEIGHT, colour)
         self.oled.show()
 
-    def print_variable_(self, message, col, row):
-        """Print a message in a space that must be cleared first."""
-        self.oled.fill_rect(col, row, len(message), 1)
+    def print_variable(self, message, col, row):
+        """Print a message in a space that must be cleared first. This is useful for printing
+        *variable* data that is constantly updating. Has '\n' support, but note that col will
+        always stay the same. E.g. if you specify a col of 4, each line will start at col 4.
+        Finally, be careful as lines that are too long will run off!"""
+        lines = message.split('\n')
+        for i in range(0, len(lines)):
+            self.oled.fill_rect(col*_CHAR_WIDTH, (row+i)*_CHAR_HEIGHT, len(lines[i])*_CHAR_WIDTH, 1*_CHAR_HEIGHT, 0)
+            self.oled.text(lines[i], col*_CHAR_WIDTH, row*_CHAR_HEIGHT, 1)
+        self.oled.show()
 
     def print(self, message):
         """
