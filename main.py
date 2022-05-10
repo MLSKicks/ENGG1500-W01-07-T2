@@ -1,9 +1,9 @@
-import vehicle_components
+from vehicle_components import Vehicle
 from time import sleep_ms
 
 
 def run_pid_test(target_mm_l, target_mm_r, kp, ki, kd, loops=30, sleep=50):
-    vehicle = vehicle_components.Vehicle(init_screen=True, init_ir_l=True, init_encoder=True, init_motor=True)
+    vehicle = Vehicle(init_screen=True, init_ir_l=True, init_encoder=True, init_motor=True)
     pid = vehicle.pid
     pid.reset(target_mm_l, target_mm_r, kp, ki, kd)
     sleep_ms(65)
@@ -33,7 +33,7 @@ STATE_LF_TURN_RIGHT = 10
 
 def main(initial_state = -1):
     # - - - - - - - - - - - - - - - - - - - - - - - initialisation - - - - - - - - - - - - - - - - - - - - - - - #
-    vehicle = vehicle_components.Vehicle(init_motor=True, init_encoder=True, init_screen=True, init_ir_l=True,
+    vehicle = Vehicle(init_motor=True, init_encoder=True, init_screen=True, init_ir_l=True,
                                          init_ir_r=True, init_us_l=True, init_us_r=True, init_rgb=True)
     pid = vehicle.pid
     screen = vehicle.screen
@@ -208,7 +208,7 @@ def pid_run(vehicle, left_target, right_target, n=1):
 
 
 def pid_gentle_curve(direction_is_left):
-    vehicle = vehicle_components.Vehicle(init_motor=True, init_encoder=True, init_screen=True)
+    vehicle = Vehicle(init_motor=True, init_encoder=True, init_screen=True)
     # direction True = turn left
     if direction_is_left:
         vehicle.screen.print("Gentle Curve\n\nTurning left")
@@ -227,7 +227,7 @@ def pid_roundabout(about_exit):
     about_exit = (about_exit % 4)
     if about_exit == 0:
         about_exit = 4  # make it travel all the way around
-    vehicle = vehicle_components.Vehicle(init_motor=True, init_encoder=True, init_screen=True)
+    vehicle = Vehicle(init_motor=True, init_encoder=True, init_screen=True)
 
     # travel onto roundabout
     vehicle.screen.print("Round About\n\nGetting on")
