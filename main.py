@@ -60,7 +60,7 @@ def print_state(screen):
         screen.print("State: Line Foll\n-owing RIGHT")
 
 
-def main(initial_state=STATE_NULL):
+def main(initial_state=NULL):
     """This is our main state machine: a big loop that performs actions based on the current state!
 
     Initialisation: initialise our Vehicle object which initialises objects for each sensor, controller, etc.
@@ -100,46 +100,28 @@ def main(initial_state=STATE_NULL):
 
         # - - - - - - - - - - - - - - - - - - - - STATE MACHINE BODY - - - - - - - - - - - - - - - - - - - - #
         if state == SPLASH_SCREEN:
-            pid.set_target(0, 0)
-            # state transition
-            state = STATE_DRIVE_FWD
+            if is_transition:
+                pid.set_target(0, 0)
 
         elif state == PRINT_ROAD_INFO:
-            # state actions
-            screen.print_unformatted("IR-L_Road={}\nIR-R_Road={}\nRGB_Road={}\nAmb={}\nHue={}\nProx={}".format(
+            screen.print_variable("IR-L Road={}\nIR-R_Road={}\nRGB_Road={}\nAmb={:12d}\nHue={:12d}\nProx={:11d}".format(
                 ir_l_onroad, ir_r_onroad, rgb_onroad, ambient, rgb_hue, rgb_prox))
-            lduty, rduty = 0, 0
+            if is_transition:
+                pid.set_target(0, 0)
             sleep_ms(250)
 
-        elif state == STATE_IDLE:
-            # state actions
-            screen.print("State: IDLE")
-            if transition_flag:
-                pid.reset_target(50, 50)
-                idle_timeout = 200
-            if pid.target_met:
-                pid.reset_target(50, 50)
-            lduty, rduty = pid.run()
-
-            # state transition
-            if ir_l_onroad():
-                state = STATE_PRINT_ART
-            elif idle_timeout <= 0:
-                state = STATE_STOP
-            else:
-                idle_timeout -= 1
-
-        elif state == STATE_STOP:
-            screen.print("State: Stopped!")
-            lduty, rduty = 0, 0
-
-        elif state == STATE_LF_FWD:
-            # state actions
-            screen.print("State: LF_FWD")
-            if transition_flag or pid.target_met:
+        elif state == IDLE:
+            if is_transition or pid.target_met():
                 pid.reset_target(50, 50)
 
-            # if we have veered off the road slightly, lets fix it
+        elif state == STOP:
+            if is_transition:
+                pid.set_target(0, 0)
+
+        elif state == LF_FWD:
+            if is_transition or pid.target_met:
+                pid.reset_target(50, 50)
+            # Adjust for slight veers left/right off the road
             if ir_l_onroad and not ir_r_onroad:  # we have veered right
                 screen.print("State: LF_FWD\nveering right")
                 pid.add_target(-15, 15)
@@ -147,10 +129,8 @@ def main(initial_state=STATE_NULL):
                 screen.print("State: LF_FWD\nveering left")
                 pid.add_target(15, -15)
 
-            lduty, rduty = pid.run()
-
         # - - - - - - - - - - - - - - - - - - - - CONTROL MOTORS - - - - - - - - - - - - - - - - - - - - #
-        vehicle.set_motor(lduty, rduty)
+        vehicle.set_motor(*pid.run())
 
 
 def test_pid(target_mm_l, target_mm_r, kp, ki, kd, loops=30, sleep=50):
@@ -199,7 +179,7 @@ def gentle_curve(turn_left=False, turn_right=False):
 
 
 def roundabout(about_exit):
-    # exit must be between 0 - 3: 0 is uturn, 1 is left, 2 is fwd, 3 is right
+    # exit must be between 0 - 3: 0 is U-turn, 1 is left, 2 is fwd, 3 is right
     about_exit = (about_exit % 4)
     if about_exit == 0:
         about_exit = 4  # make it travel all the way around
@@ -213,7 +193,7 @@ def roundabout(about_exit):
     for i in range(0, about_exit, 1):
         # complete the quarter turn
         vehicle.screen.print("Round About\n\nTravelling around {}/{}".format(i, about_exit))
-        pid_run(vehicle, 245, 15)  # 434, 214 * 0.75 then hand tuned
+        run_pid(vehicle, 245, 15)  # 434, 214 * 0.75 then hand tuned
 
     # travel off roundabout
     vehicle.screen.print("Round About\n\nGetting off")
@@ -230,4 +210,4 @@ if __name__ == "__main__":
     gentle_curve(turn_right=True)
 
     sleep_ms(2000)
-    main(STATE_LF_FWD)
+    main(LF_FWD)

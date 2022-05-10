@@ -42,11 +42,12 @@ class Screen:
         """Print a message in a space that must be cleared first. This is useful for printing
         *variable* data that is constantly updating. Has '\n' support, but note that col will
         always stay the same. E.g. if you specify a col of 4, each line will start at col 4.
-        Finally, be careful as lines that are too long will run off!"""
+        Finally, be careful as lines that are too long will run off! Finally, FINALLY, be careful
+        of artifacts left if variables are not always constant width"""
         lines = message.split('\n')
         for i in range(0, len(lines)):
             self.oled.fill_rect(col*_CHAR_WIDTH, (row+i)*_CHAR_HEIGHT, len(lines[i])*_CHAR_WIDTH, 1*_CHAR_HEIGHT, 0)
-            self.oled.text(lines[i], col*_CHAR_WIDTH, row*_CHAR_HEIGHT, 1)
+            self.oled.text(lines[i], col*_CHAR_WIDTH, (row+i)*_CHAR_HEIGHT, 1)
         self.oled.show()
 
     def print(self, message):
