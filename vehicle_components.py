@@ -7,8 +7,8 @@ from components.ir_sensor import InfraRed
 from components.encoder import EncoderClicker
 from components.motor import Motor
 from components.oled_screen import Screen
-from pid_control import PIDController
-from pid_control import clicks_to_mm
+from motor_control import MotorController
+from motor_control import clicks_to_mm
 
 
 # - - - - - - - - - - - - - - - - - - - - DEBUG PRINTING - - - - - - - - - - - - - - - - - - - - #
@@ -65,7 +65,7 @@ class Vehicle:
             self.get_calibration_ir('ir_r.txt', 'R', self.ir_r)
         if self.init_encoder:
             self.encoder = EncoderClicker(19, 18)  # ENC_L corresponds to MOTOR_RIGHT so have to swap pin order!
-            self.pid = PIDController(self.encoder)
+            self.controller = MotorController(self.encoder)
 
         # Initialise constants
         self.SENSOR_SLEEP_MS = 10  # tells us how long to sleep before taking a new reading in update_sleep(ms)

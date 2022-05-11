@@ -66,30 +66,30 @@ def print_state(screen):
             screen.print("State: Not Found")
 
 
-def set_initial_targets(pid):
+def set_initial_targets(controller):
     """Sets the initial targets for each state"""
     global state, is_transition
-    if is_transition:  # Run this ONCE when we have just entered a new state -> otherwise pid control will break
+    if is_transition:  # Run this ONCE when we have just entered a new state -> otherwise motor controller will break
         # if state == NULL:
-        #     pid.set_target(0, 0)
+        #     controller.set_target(0, 0)
         # elif state == SPLASH_SCREEN:
-        #     pid.set_target(0, 0)
+        #     controller.set_target(0, 0)
         # elif state == PRINT_ROAD_INFO:
-        #     pid.set_target(0, 0)
+        #     controller.set_target(0, 0)
         # elif state == IDLE:
-        #     pid.set_target(0, 0)
+        #     controller.set_target(0, 0)
         # elif state == STOP:
-        #     pid.set_target(0, 0)
+        #     controller.set_target(0, 0)
         # elif state == HAZARD:
-        #     pid.set_target(0, 0)
+        #     controller.set_target(0, 0)
         if state == LF_FWD:
-            pid.set_target(50, 50)
+            controller.set_target(50, 50)
         elif state == LF_TURN_LEFT:
-            pid.set_target(50, 100)
+            controller.set_target(50, 100)
         elif state == LF_TURN_RIGHT:
-            pid.set_target(100, 50)
+            controller.set_target(100, 50)
         else:
-            pid.set_target(0, 0)
+            controller.set_target(0, 0)
 
 
 def elapsed_ms():
@@ -114,7 +114,7 @@ def main(initial_state=NULL):
 
     # - - - - - - - - - - - - - - - - - - - - - - - INITIALISATION - - - - - - - - - - - - - - - - - - - - - - - #
     vehicle = Vehicle(motor=True, enc=True, screen=True, rgb=True, ir_l=True, ir_r=True, us_l=True, us_r=True)
-    pid = vehicle.pid          # Get PID-control object -> can set motor duties to achieve desired targets
+    controller = vehicle.controller          # Get motor control object -> can set duties to achieve desired targets
     screen = vehicle.screen    # Get OLED screen object -> can print useful information
     state = initial_state      # Set the requested initial state
 
@@ -137,7 +137,7 @@ def main(initial_state=NULL):
         # - - - - - - - - - - - - - - - - - - - - STATE MACHINE HEADER - - - - - - - - - - - - - - - - - - - #
         update_state_variables()  # Updates prev_state and is_transition flag
         print_state(screen)       # Prints current state information if we just transitioned
-        set_initial_targets(pid)  # Sets our PID targets if we just transitioned
+        set_initial_targets(controller)  # Sets our controller targets if we just transitioned
 
         # - - - - - - - - - - - - - - - - - - - - STATE MACHINE BODY - - - - - - - - - - - - - - - - - - - - #
         # - SPLASH_SCREEN -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
@@ -161,14 +161,14 @@ def main(initial_state=NULL):
         # - IDLE -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
         # If we are lost, we go into idle and wander around
         elif state == IDLE:  # TODO: Smarter idle wandering
-            if pid.target_met():
-                pid.set_target(50, 50)
+            if controller.target_met():
+                controller.set_target(50, 50)
 
         # - STOP -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
         # Stop once we have finished our task
         elif state == STOP:  # TODO: How does user ask vehicle to go again after finishing track?
             if is_transition:
-                pid.set_target(0, 0)
+                controller.set_target(0, 0)
 
         # - HAZARD -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
         # Stop if we encounter a hazard on the road
@@ -179,47 +179,46 @@ def main(initial_state=NULL):
         # Line-Follow-Forward attempts to follow straight or slightly bendy lines
         elif state == LF_FWD:  # TODO: Fix Line Following
             # If we finished our target, just go again
-            if pid.target_met():
-                pid.set_target(50, 50)
+            if controller.target_met():
+                controller.set_target(50, 50)
 
             # Adjust for slight veers rightwards off the road -> by veering left
             if ir_l_onroad and not ir_r_onroad:
                 screen.print("State: LF_FWD\nveering right")
-                pid.add_target(-15, 15)
+                controller.add_target(-15, 15)
 
             # Adjust for slight veers leftwards off the road -> by veering right
             if not ir_l_onroad and ir_r_onroad:
                 screen.print("State: LF_FWD\nveering left")
-                pid.add_target(15, -15)
+                controller.add_target(15, -15)
 
         # - - - - - - - - - - - - - - - - - - - - CONTROL MOTORS - - - - - - - - - - - - - - - - - - - - #
-        vehicle.set_motor(*pid.run())
+        vehicle.set_motor(*controller.run())
+
+# def test_controller(target_mm_l, target_mm_r, kp, ki, kd, loops=30, sleep=50):
+#     """Test different proportionality constants for controller"""
+#     vehicle = Vehicle(screen=True, ir_l=True, enc=True, motor=True)
+#     vehicle.controller.reset(target_mm_l, target_mm_r, kp, ki, kd)
+#     for i in range(0, loops):
+#         vehicle.set_motor(*vehicle.controller.run())
+#         sleep_ms(sleep)
+#     vehicle.set_motor(0, 0)
 
 
-def test_pid(target_mm_l, target_mm_r, kp, ki, kd, loops=30, sleep=50):
-    """Test different proportionality constants for pid"""
-    vehicle = Vehicle(screen=True, ir_l=True, enc=True, motor=True)
-    vehicle.pid.reset(target_mm_l, target_mm_r, kp, ki, kd)
-    for i in range(0, loops):
-        vehicle.set_motor(*vehicle.pid.run())
-        sleep_ms(sleep)
-    vehicle.set_motor(0, 0)
-
-
-def run_pid(vehicle, left_target, right_target, n=1):
+def run(vehicle, left_target, right_target, n=1):
     # Divide the targets into n steps or segments
     left_target_step = left_target/n
     right_target_step = right_target/n
 
     # Set our initial target
-    vehicle.pid.set_target(left_target_step, right_target_step)
+    vehicle.controller.set_target(left_target_step, right_target_step)
 
     # Once each step is done, add the next step. Loop until we are done!
     for i in range(0, n, 1):
-        while not vehicle.pid.target_met():
-            vehicle.set_motor(*vehicle.pid.run())
+        while not vehicle.controller.target_met():
+            vehicle.set_motor(*vehicle.controller.run())
 
-        vehicle.pid.add_target(left_target_step, right_target_step)
+        vehicle.controller.add_target(left_target_step, right_target_step)
 
     # Done, so stop motors
     vehicle.set_motor(0, 0)
@@ -229,11 +228,11 @@ def gentle_curve(vehicle, turn_left=False, turn_right=False):
     """ Travel around the gentle curve track piece, in either the left or right direction"""
     if turn_left:
         vehicle.screen.print("Gentle Curve\n\nTurning left")
-        run_pid(vehicle, 300, 500, 3)
+        run(vehicle, 300, 500, 3)
 
     if turn_right:
         vehicle.screen.print("Gentle Curve\n\nTurning right")
-        run_pid(vehicle, 500, 300, 3)
+        run(vehicle, 500, 300, 3)
 
 
 def roundabout(vehicle, exit_):
@@ -250,17 +249,17 @@ def roundabout(vehicle, exit_):
 
     # Travel onto the roundabout
     vehicle.screen.print("Round About\n\nGetting on")
-    run_pid(vehicle, 40, 40)
-    run_pid(vehicle, -80, 80)
+    run(vehicle, 40, 40)
+    run(vehicle, -80, 80)
 
     for i in range(0, exit_, 1):
         # Complete a quarter turn
         vehicle.screen.print("Round About\n\nTravelling around {}/{}".format(i, exit_))
-        run_pid(vehicle, 245, 15)
+        run(vehicle, 245, 15)
 
     # Travel out of the roundabout
     vehicle.screen.print("Round About\n\nGetting off")
-    run_pid(vehicle, -90, 90)
+    run(vehicle, -90, 90)
 
 
 if __name__ == "__main__":
