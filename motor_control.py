@@ -1,4 +1,4 @@
-from time import ticks_ms, ticks_diff, sleep_ms
+from time import ticks_ms, ticks_diff
 from math import atan, exp
 
 
@@ -12,7 +12,7 @@ def mm_to_clicks(mm):
 def clicks_to_mm(clicks):
     wheel_circumference = 3.1416 * 65
     clicks_per_revolution = 40
-    return int((clicks * wheel_circumference) / clicks_per_revolution)
+    return (clicks * wheel_circumference) / clicks_per_revolution
 
 
 def clamp(duty, max_duty, min_duty):
@@ -24,24 +24,17 @@ def clamp(duty, max_duty, min_duty):
         return duty
 
 
-def output(target, error):
-    amplitude = 200/3.1416 * atan(target/150)
-    width = -1/target**1.5
-    offset = target/2
-    return amplitude*exp(width*(error-offset)**2)
-
-
 class MotorController:
-    def __init__(self, encoder, target_mm_left=0, target_mm_right=0):
+    def __init__(self, encoder, target_mm_left=0, target_mm_right=0, amplitude=32.5, offset=1.2, base_duty=30, bias=5):
         """initialise all PID controller constants, variables, and encoder object"""
         # initialise target and encoder object
-        self.target_clicks_left = mm_to_clicks(target_mm_left)
-        self.target_clicks_right = mm_to_clicks(target_mm_right)
+        self.target_mm_left = target_mm_left
+        self.target_mm_right = target_mm_right
         self.encoder = encoder
 
         # encoder polarity is true for a forwards/zero target, and false for a backwards target
-        encoder_polarity_left = self.target_clicks_left >= 0
-        encoder_polarity_right = self.target_clicks_right >= 0
+        encoder_polarity_left = self.target_mm_left >= 0
+        encoder_polarity_right = self.target_mm_right >= 0
         self.encoder.clear_count()
         self.encoder.set_left_dir(encoder_polarity_left)
         self.encoder.set_right_dir(encoder_polarity_right)
@@ -49,49 +42,83 @@ class MotorController:
         self.toggle_left_enc = False
         self.toggle_right_enc = False
 
+        self.t0 = ticks_ms()
+        self.dt = 0
+
         # initialise variables for PID control
-        self.click_left, self.click_right = 0, 0
-        self.error_left, self.error_right = 0, 0
+        self.mm_left, self.mm_right = 0, 0
+        self.error_left, self.error_right = target_mm_left, target_mm_right
         self.prev_error_left, self.prev_error_right = 0, 0
         self.duty_left, self.duty_right = 0, 0
 
-        self.t0 = ticks_ms()
-        self.dt = 0
+        # constants for output calculations
+        self.amplitude = amplitude
+        self.base_duty = base_duty  # This is the baseline duty value
+        self.offset_amount = offset
 
         # clamp and bias constants
         self.max_duty = 75
         self.min_duty = -75
-        self.bias = 3
+        self.bias = bias
+
+    def reset(self, target_mm_left, target_mm_right, amplitude, offset, base_duty, bias):
+        self.__init__(self.encoder, target_mm_left, target_mm_right, amplitude, offset, base_duty, bias)
 
     def set_target(self, target_mm_left, target_mm_right):
-        """Reset PID control with a new target"""
+        """Reset controller with a new target"""
         self.__init__(self.encoder, target_mm_left, target_mm_right)
 
     def add_target(self, target_mm_left, target_mm_right):
-        self.target_clicks_left += mm_to_clicks(target_mm_left)
-        self.target_clicks_right += mm_to_clicks(target_mm_right)
+        self.target_mm_left += target_mm_left
+        self.target_mm_right += target_mm_right
 
     def target_met(self):
         target_met = True
 
-        if not (-2 < self.error_left < 2):
+        if not (-20 <= self.error_left <= 20):
             target_met = False
 
-        if not (-2 < self.error_right < 2):
+        if not (-20 <= self.error_right <= 20):
             target_met = False
 
         return target_met
+
+    def output(self, target, error):
+        """Create the output function w.r.t error. This function is a bell curve,
+        with amplitude dependent on the size of the target."""
+        print("Target = {}, error = {}, ".format(target, error), end="")
+        if target == 0:
+            return 0
+
+        if -20 >= error >= 20:
+            return 0
+
+        if error > 0:  # find out which direction to go
+            polarity = 1
+        else:
+            polarity = -1
+
+        if target < 0:  # Ensure target is positive, its just how the maths works
+            target = -target
+
+        # Do the actual calculation
+        amplitude = self.amplitude * atan(target/150)
+        width = -1 / target ** 1.5
+        offset = target / self.offset_amount
+        print("amplitude = {}, width = {}, offset = {}, offset_amount = {}".format(amplitude, width, offset, self.offset_amount))
+        return polarity * (amplitude * exp(width * (polarity*error - offset) ** 2) + self.base_duty)
 
     def run(self):
         """Calculates the pwm values using a closed feedback loop"""
         self.update_duty()
         self.update_encoder()
+        self.print_csv_data()
         return self.duty_correction()
 
     def duty_correction(self):
-        """Fix bias to correct the motor imbalances. Note: a positive bias means we need to
-        increase power to the right motor, and decrease power to the left motor"""
-        return int(self.duty_left - self.bias), int(self.duty_right + self.bias)
+        """Fix bias to correct the motor imbalances. Note: a positive bias means we are
+        increasing power to the left motor, and decreasing power to the right motor"""
+        return int(self.duty_left + self.bias), int(self.duty_right - self.bias)
 
     def update_elapsed_time(self):
         """Calculates the elapsed time, dt, since the last call. Also resets self.t0"""
@@ -108,13 +135,13 @@ class MotorController:
         self.prev_error_right = self.error_right
 
         # calculate current error
-        self.click_left, self.click_right = self.encoder.get_left(), self.encoder.get_right()
-        self.error_left = self.target_clicks_left - self.encoder.get_left()
-        self.error_right = self.target_clicks_right - self.encoder.get_right()
+        self.mm_left, self.mm_right = clicks_to_mm(self.encoder.get_left()), clicks_to_mm(self.encoder.get_right())
+        self.error_left = self.target_mm_left - self.mm_left
+        self.error_right = self.target_mm_right - self.mm_right
 
         # calculate duties
-        self.duty_left = output(self.target_clicks_left, self.error_left)
-        self.duty_right = output(self.target_clicks_right, self.error_right)
+        self.duty_left = self.output(self.target_mm_left, self.error_left)
+        self.duty_right = self.output(self.target_mm_right, self.error_right)
 
         # clamp duties
         self.duty_left = clamp(self.duty_left, self.max_duty, self.min_duty)
@@ -151,7 +178,7 @@ class MotorController:
             # overwrite any duties
             self.duty_left = 0
             # wait until vehicle is stationary
-            if self.click_left + self.prev_error_left - self.target_clicks_left == 0:
+            if self.mm_left + self.prev_error_left - self.target_mm_left == 0:
                 self.encoder.toggle_left_dir()
                 self.toggle_left_enc = False
 
@@ -159,11 +186,10 @@ class MotorController:
             # overwrite any duties
             self.duty_right = 0
             # wait until vehicle is stationary
-            if self.click_right + self.prev_error_right - self.target_clicks_right == 0:
+            if self.mm_right + self.prev_error_right - self.target_mm_right == 0:
                 self.encoder.toggle_right_dir()
                 self.toggle_right_enc = False
 
     def print_csv_data(self):
-        """prints out csv data with headings 'dt, lprp, lint, ldrv, ldty, lclk, rprp, rint, rdrv, rdty, rclk'"""
-        print("{},{},{},{},{}".format(self.dt, self.duty_left, self.click_left, self.duty_right, self.click_right))
-
+        """prints out csv data with headings dt, left_duty, left_clicks, right_duty, right_clicks"""
+        print("{},{},{},{},{}".format(self.dt, self.duty_left, self.mm_left, self.duty_right, self.mm_right))

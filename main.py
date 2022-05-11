@@ -195,30 +195,24 @@ def main(initial_state=NULL):
         # - - - - - - - - - - - - - - - - - - - - CONTROL MOTORS - - - - - - - - - - - - - - - - - - - - #
         vehicle.set_motor(*controller.run())
 
-# def test_controller(target_mm_l, target_mm_r, kp, ki, kd, loops=30, sleep=50):
-#     """Test different proportionality constants for controller"""
-#     vehicle = Vehicle(screen=True, ir_l=True, enc=True, motor=True)
-#     vehicle.controller.reset(target_mm_l, target_mm_r, kp, ki, kd)
-#     for i in range(0, loops):
-#         vehicle.set_motor(*vehicle.controller.run())
-#         sleep_ms(sleep)
-#     vehicle.set_motor(0, 0)
+
+def test_controller(target_mm_l, target_mm_r, amplitude, offset, base_duty, bias=3, loops=30, sleep=50):
+    """Test different proportionality constants for controller"""
+    vehicle = Vehicle(screen=True, enc=True, motor=True)
+    vehicle.controller.reset(target_mm_l, target_mm_r, amplitude, offset, base_duty, bias)
+    for i in range(0, loops):
+        vehicle.set_motor(*vehicle.controller.run())
+        sleep_ms(sleep)
+    vehicle.set_motor(0, 0)
 
 
 def run(vehicle, left_target, right_target, n=1):
-    # Divide the targets into n steps or segments
-    left_target_step = left_target/n
-    right_target_step = right_target/n
+    # Set our target
+    vehicle.controller.set_target(left_target, right_target)
 
-    # Set our initial target
-    vehicle.controller.set_target(left_target_step, right_target_step)
-
-    # Once each step is done, add the next step. Loop until we are done!
-    for i in range(0, n, 1):
-        while not vehicle.controller.target_met():
-            vehicle.set_motor(*vehicle.controller.run())
-
-        vehicle.controller.add_target(left_target_step, right_target_step)
+    # Loop until we are done!
+    while not vehicle.controller.target_met():
+        vehicle.set_motor(*vehicle.controller.run())
 
     # Done, so stop motors
     vehicle.set_motor(0, 0)
@@ -228,11 +222,11 @@ def gentle_curve(vehicle, turn_left=False, turn_right=False):
     """ Travel around the gentle curve track piece, in either the left or right direction"""
     if turn_left:
         vehicle.screen.print("Gentle Curve\n\nTurning left")
-        run(vehicle, 300, 500, 3)
+        run(vehicle, 300, 500)
 
     if turn_right:
         vehicle.screen.print("Gentle Curve\n\nTurning right")
-        run(vehicle, 500, 300, 3)
+        run(vehicle, 500, 300)
 
 
 def roundabout(vehicle, exit_):
@@ -249,17 +243,17 @@ def roundabout(vehicle, exit_):
 
     # Travel onto the roundabout
     vehicle.screen.print("Round About\n\nGetting on")
-    run(vehicle, 40, 40)
-    run(vehicle, -80, 80)
+    run(vehicle, 100, 100)
+    run(vehicle, -130, 130)
 
     for i in range(0, exit_, 1):
         # Complete a quarter turn
         vehicle.screen.print("Round About\n\nTravelling around {}/{}".format(i, exit_))
-        run(vehicle, 245, 15)
+        run(vehicle, 267, 31)
 
     # Travel out of the roundabout
     vehicle.screen.print("Round About\n\nGetting off")
-    run(vehicle, -90, 90)
+    run(vehicle, -130, 130)
 
 
 if __name__ == "__main__":
