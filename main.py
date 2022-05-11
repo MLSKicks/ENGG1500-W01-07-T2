@@ -1,5 +1,5 @@
 from vehicle_components import Vehicle
-from time import sleep_ms  # ticks_ms, ticks_diff,
+from time import sleep_ms, ticks_ms, ticks_diff,
 
 # - - - - - - - - - - - - - - - - - - - - - - - RANDOM STUFF - - - - - - - - - - - - - - - - - - - - - - - - - -#
 ascii_cat = ("State: PRINT_ART\n\n    _,,/|\n"
@@ -23,22 +23,26 @@ LF_TURN_RIGHT = 7
 
 
 # - - - - - - - - - - - - - - - - - - - - - - - STATE VARIABLES - - - - - - - - - - - - - - - - - - - - - - - - #
-prev_state = NULL
-state = NULL
-is_transition = False
+prev_state = NULL        # Previous state
+state = NULL             # Current state
+is_transition = False    # Transition flag telling us if we just switched states
+t0 = ticks_ms()          # For calculating time spent in a state
 
 
 def update_state_variables():
     """Updates our previous state (prev_state) variable and transition flag (is_transition).
     The transition flag tells us if we have just transitioned to a new state. This is helpful
     in running a piece of code in a state one and once only."""
-    global prev_state, state, is_transition
+    global prev_state, state, is_transition, t0
     is_transition = prev_state != state
     prev_state = state
+    if is_transition:
+        t0 = ticks_ms()
 
 
 def print_state(screen):
     """Print out what state we are in"""
+    global state, is_transition
     if is_transition:  # Run this ONCE when we have just entered a new state -> avoids flickering
         if state == NULL:
             screen.print("State: NULL\n\nNo initial state\nwas specified!")
@@ -64,20 +68,21 @@ def print_state(screen):
 
 def set_initial_targets(pid):
     """Sets the initial targets for each state"""
+    global state, is_transition
     if is_transition:  # Run this ONCE when we have just entered a new state -> otherwise pid control will break
-        if state == NULL:
-            pid.set_target(0, 0)
-        elif state == SPLASH_SCREEN:
-            pid.set_target(0, 0)
-        elif state == PRINT_ROAD_INFO:
-            pid.set_target(0, 0)
-        elif state == IDLE:
-            pid.set_target(0, 0)
-        elif state == STOP:
-            pid.set_target(0, 0)
-        elif state == HAZARD:
-            pid.set_target(0, 0)
-        elif state == LF_FWD:
+        # if state == NULL:
+        #     pid.set_target(0, 0)
+        # elif state == SPLASH_SCREEN:
+        #     pid.set_target(0, 0)
+        # elif state == PRINT_ROAD_INFO:
+        #     pid.set_target(0, 0)
+        # elif state == IDLE:
+        #     pid.set_target(0, 0)
+        # elif state == STOP:
+        #     pid.set_target(0, 0)
+        # elif state == HAZARD:
+        #     pid.set_target(0, 0)
+        if state == LF_FWD:
             pid.set_target(50, 50)
         elif state == LF_TURN_LEFT:
             pid.set_target(50, 100)
@@ -85,6 +90,12 @@ def set_initial_targets(pid):
             pid.set_target(100, 50)
         else:
             pid.set_target(0, 0)
+
+
+def elapsed_ms():
+    """Calculates the elapsed ms in the current state, relies on update_state_variables()"""
+    global t0
+    return ticks_diff(ticks_ms(), t0)
 
 
 def main(initial_state=NULL):
@@ -99,7 +110,7 @@ def main(initial_state=NULL):
 
     State Machine Body: goes through all the nitty-gritty details """
 
-    global prev_state, state, is_transition, ascii_cat
+    global prev_state, state, is_transition, ascii_cat, t0
 
     # - - - - - - - - - - - - - - - - - - - - - - - INITIALISATION - - - - - - - - - - - - - - - - - - - - - - - #
     vehicle = Vehicle(motor=True, enc=True, screen=True, rgb=True, ir_l=True, ir_r=True, us_l=True, us_r=True)
@@ -111,7 +122,8 @@ def main(initial_state=NULL):
         # - - - - - - - - - - - - - - - - - - - - SENSOR DATA COLLECTION - - - - - - - - - - - - - - - - - - #
         ir_l_onroad = vehicle.ir_l.is_on_road()
         ir_r_onroad = vehicle.ir_r.is_on_road()
-        rgb_onroad = vehicle.rgb.is_on_road_by_prox()
+        rgb_onroad = vehicle.rgb.is_on_road()  # rgb_onroad is more vague than rgb_directly_onroad
+        rgb_directly_onroad = vehicle.rgb.is_on_road_by_prox()  # more like an IR sensor reading
         ambient = vehicle.rgb.ambient()
         rgb_hue = vehicle.rgb.hue()
         rgb_prox = vehicle.rgb.proximity_mm()
@@ -130,8 +142,9 @@ def main(initial_state=NULL):
         # - - - - - - - - - - - - - - - - - - - - STATE MACHINE BODY - - - - - - - - - - - - - - - - - - - - #
         # - SPLASH_SCREEN -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
         # Prints a cat to the screen for a second
-        if state == SPLASH_SCREEN:  # TODO: Implement second delay
-            pass
+        if state == SPLASH_SCREEN:
+            if elapsed_ms() > 1000:
+                state = PRINT_ROAD_INFO
 
         # - PRINT_ROAD_INFO -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
         # Displays what our IR/RGB sensors are saying about the road
@@ -141,7 +154,7 @@ def main(initial_state=NULL):
                                   "RGB Road{!s:>8}\n"
                                   "RGB Amb{:9d}\n"
                                   "RGB Hue{:9d}\n"
-                                  "RGB Prox{:8d}".format(ir_l_onroad, ir_r_onroad, rgb_onroad,
+                                  "RGB Prox{:8d}".format(ir_l_onroad, ir_r_onroad, rgb_directly_onroad,
                                                          ambient, rgb_hue, rgb_prox),
                                   0, 2)
 
@@ -262,4 +275,4 @@ if __name__ == "__main__":
     del v
 
     sleep_ms(1000)
-    main(LF_FWD)
+    main(SPLASH_SCREEN)

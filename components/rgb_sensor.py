@@ -122,6 +122,6 @@ class RGB:
         return False
 
     def is_on_road_by_prox(self):
-        if self.proximity() <= 1:
+        if self.proximity() <= 4:
             return True
         return False
