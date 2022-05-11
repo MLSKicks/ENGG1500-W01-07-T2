@@ -1,5 +1,7 @@
 from vehicle_components import Vehicle
 from time import ticks_ms, ticks_diff, sleep_ms
+from enum import Enum
+
 
 # - - - - - - - - - - - - - - - - - - - - - - - RANDOM STUFF - - - - - - - - - - - - - - - - - - - - - - - - - -#
 ascii_cat = ("State: PRINT_ART\n\n    _,,/|\n"
@@ -9,20 +11,23 @@ ascii_cat = ("State: PRINT_ART\n\n    _,,/|\n"
              "   (////_)//\n"
              "   ~~~")
 
+
 # - - - - - - - - - - - - - - - - - - - - - - - STATE ENUMERATION - - - - - - - - - - - - - - - - - - - - - - - #
-NULL = -1
-SPLASH_SCREEN = 0
-PRINT_ROAD_INFO = 1
-IDLE = 2
-STOP = 3
-HAZARD = 4
-LF_FWD = 5
-LF_TURN_LEFT = 6
-LF_TURN_RIGHT = 7
+class State(Enum):
+    NULL = -1
+    SPLASH_SCREEN = 0
+    PRINT_ROAD_INFO = 1
+    IDLE = 2
+    STOP = 3
+    HAZARD = 4
+    LF_FWD = 5
+    LF_TURN_LEFT = 6
+    LF_TURN_RIGHT = 7
+
 
 # - - - - - - - - - - - - - - - - - - - - - - - STATE VARIABLES - - - - - - - - - - - - - - - - - - - - - - - - #
-prev_state = NULL
-state = NULL
+prev_state = State.NULL
+state = State.NULL
 is_transition = False
 
 
@@ -38,29 +43,29 @@ def update_state_variables():
 def print_state(screen):
     """Print out what state we are in"""
     if is_transition:  # Run this ONCE when we have just entered a new state -> avoids flickering
-        if state == NULL:
+        if state == State.NULL:
             screen.print("State: NULL\n\nNo initial state\nwas specified!")
-        elif state == SPLASH_SCREEN:
+        elif state == State.SPLASH_SCREEN:
             screen.print_art(ascii_cat)
-        elif state == PRINT_ROAD_INFO:
+        elif state == State.PRINT_ROAD_INFO:
             screen.print("State: Road Info")
-        elif state == IDLE:
+        elif state == State.IDLE:
             screen.print("State: Idling\n\nI am lost!")
-        elif state == STOP:
+        elif state == State.STOP:
             screen.print("State: Stopped\n\nMy job is done!")
-        elif state == HAZARD:
+        elif state == State.HAZARD:
             screen.print("State: Hazard\n\nSomething got in\n my way!")
-        elif state == LF_FWD:
+        elif state == State.LF_FWD:
             screen.print("State: Line Foll\n-owing")
-        elif state == LF_TURN_LEFT:
+        elif state == State.LF_TURN_LEFT:
             screen.print("State: Line Foll\n-owing LEFT")
-        elif state == LF_TURN_RIGHT:
+        elif state == State.LF_TURN_RIGHT:
             screen.print("State: Line Foll\n-owing RIGHT")
         else:
             screen.print("State: Not Found")
 
 
-def main(initial_state=NULL):
+def main(initial_state=State.NULL):
     """This is our main state machine: a big loop that performs actions based on the current state!
 
     Initialisation: initialise our Vehicle object which initialises objects for each sensor, controller, etc.
@@ -92,18 +97,18 @@ def main(initial_state=NULL):
 
         # - - - - - - - - - - - - - - - - - - - - GLOBAL TRANSITIONS - - - - - - - - - - - - - - - - - - - - #
         if rgb_prox < 35:  # Something is on the road or obstructing the sensor... so lets stop
-            state = HAZARD
+            state = State.HAZARD
 
         # - - - - - - - - - - - - - - - - - - - - STATE MACHINE HEADER - - - - - - - - - - - - - - - - - - - #
         update_state_variables()
         print_state(screen)
 
         # - - - - - - - - - - - - - - - - - - - - STATE MACHINE BODY - - - - - - - - - - - - - - - - - - - - #
-        if state == SPLASH_SCREEN:
+        if state == State.SPLASH_SCREEN:
             if is_transition:
                 pid.set_target(0, 0)
 
-        elif state == PRINT_ROAD_INFO:
+        elif state == State.PRINT_ROAD_INFO:
             screen.print_variable("IR-L Road{!s:>7}\n"
                                   "IR-R Road{!s:>7}\n"
                                   "RGB Road{!s:>8}\n"
@@ -114,15 +119,15 @@ def main(initial_state=NULL):
             if is_transition:
                 pid.set_target(0, 0)
 
-        elif state == IDLE:
+        elif state == State.IDLE:
             if is_transition or pid.target_met():
                 pid.set_target(50, 50)
 
-        elif state == STOP:
+        elif state == State.STOP:
             if is_transition:
                 pid.set_target(0, 0)
 
-        elif state == LF_FWD:
+        elif state == State.LF_FWD:
             if is_transition or pid.target_met:
                 pid.set_target(50, 50)
             # Adjust for slight veers left/right off the road
@@ -214,4 +219,4 @@ if __name__ == "__main__":
     gentle_curve(turn_right=True)
 
     sleep_ms(2000)
-    main(LF_FWD)
+    main(State.LF_FWD)
