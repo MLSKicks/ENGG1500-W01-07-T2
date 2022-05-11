@@ -49,7 +49,7 @@ class MotorController:
         self.max_duty = 75  # This is the max duty we are allowed to produce
         self.min_duty = -75  # This is the min duty we are allowed to produce
         self.bias = bias  # Correcting motor imbalances
-        self.integral_count_left, self.integral_count_right = 0, 0
+        self.stuck_count_left, self.stuck_count_right = 0, 0
 
         # Constants for output calculations
         self.amplitude = amplitude
@@ -85,11 +85,9 @@ class MotorController:
             target_met = False
         return target_met
 
-    def output(self, target, error, prev_error, integral_count):
+    def output(self, target, error, prev_error, stuck_count):
         """Create the output function w.r.t error. This function is a bell curve,
         with amplitude dependent on the size of the target."""
-        print("Target = {}, error = {}, ".format(target, error), end="")
-
         # If the target is already met, we do nothing
         if -self.target_tolerance >= error >= self.target_tolerance:
             return 0
@@ -105,18 +103,20 @@ class MotorController:
         amplitude = self.amplitude * atan(target/150)
         width = -1 / target ** 1.5
         offset = target / self.offset_amount
-        print("amplitude = {}, width = {}, offset = {}, offset_amount = {}".format(amplitude, width, offset, self.offset_amount))
+
         duty = polarity * (amplitude * exp(width * (polarity*error - offset) ** 2) + self.base_duty)
 
         # In case we get stuck at one spot, add an 'integral term'
         if abs(prev_error - error) <= 5:
-            print("adding some integral term!")
-            duty += integral_count % 10
-            integral_count += 1
+            print("Trying to get unstuck {}: ".format(stuck_count), end="")
+            duty += stuck_count / 10
+            stuck_count += 1
         else:
-            integral_count = 0
+            stuck_count = 0
 
-        return integral_count, duty
+        print("Target={}, err={}, amplitude={}, width={}, offset={}".format(target, error, amplitude, width, offset))
+
+        return stuck_count, duty
 
     def duty_correction(self):
         """Fix bias to correct the motor imbalances. Note: a positive bias means we are
@@ -143,10 +143,10 @@ class MotorController:
         self.error_right = self.target_mm_right - self.mm_right
 
         # Calculate duties
-        self.integral_count_left, self.duty_left = \
-            self.output(self.target_mm_left, self.error_left, self.prev_error_left, self.integral_count_left)
-        self.integral_count_right, self.duty_right = \
-            self.output(self.target_mm_right, self.error_right, self.prev_error_right, self.integral_count_right)
+        self.stuck_count_left, self.duty_left = \
+            self.output(self.target_mm_left, self.error_left, self.prev_error_left, self.stuck_count_left)
+        self.stuck_count_right, self.duty_right = \
+            self.output(self.target_mm_right, self.error_right, self.prev_error_right, self.stuck_count_right)
 
         # Clamp duties
         self.duty_left = clamp(self.duty_left, self.max_duty, self.min_duty)
