@@ -1,5 +1,5 @@
 from vehicle_components import Vehicle
-from time import sleep_ms, ticks_ms, ticks_diff,
+from time import sleep_ms, ticks_ms, ticks_diff
 
 # - - - - - - - - - - - - - - - - - - - - - - - RANDOM STUFF - - - - - - - - - - - - - - - - - - - - - - - - - -#
 ascii_cat = ("State: PRINT_ART\n\n    _,,/|\n"
