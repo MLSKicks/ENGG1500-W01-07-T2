@@ -31,6 +31,7 @@ class MotorController:
         self.target_mm_left = target_mm_left
         self.target_mm_right = target_mm_right
         self.encoder = encoder
+        self.target_tolerance = 11
 
         # encoder polarity is true for a forwards/zero target, and false for a backwards target
         encoder_polarity_left = self.target_mm_left >= 0
@@ -72,13 +73,21 @@ class MotorController:
         self.target_mm_left += target_mm_left
         self.target_mm_right += target_mm_right
 
+    def run(self):
+        """Calculates the pwm values using a closed feedback loop"""
+        self.update_duty()
+        self.update_encoder()
+        self.print_csv_data()
+        return self.duty_correction()
+
     def target_met(self):
+        """Checks if the target has been met"""
         target_met = True
 
-        if not (-20 <= self.error_left <= 20):
+        if not (-self.target_tolerance <= self.error_left <= self.target_tolerance):
             target_met = False
 
-        if not (-20 <= self.error_right <= 20):
+        if not (-self.target_tolerance <= self.error_right <= self.target_tolerance):
             target_met = False
 
         return target_met
@@ -90,7 +99,7 @@ class MotorController:
         if target == 0:
             return 0
 
-        if -20 >= error >= 20:
+        if -self.target_tolerance >= error >= self.target_tolerance:  # if target is already met, do nothing
             return 0
 
         if error > 0:  # find out which direction to go
@@ -107,13 +116,6 @@ class MotorController:
         offset = target / self.offset_amount
         print("amplitude = {}, width = {}, offset = {}, offset_amount = {}".format(amplitude, width, offset, self.offset_amount))
         return polarity * (amplitude * exp(width * (polarity*error - offset) ** 2) + self.base_duty)
-
-    def run(self):
-        """Calculates the pwm values using a closed feedback loop"""
-        self.update_duty()
-        self.update_encoder()
-        self.print_csv_data()
-        return self.duty_correction()
 
     def duty_correction(self):
         """Fix bias to correct the motor imbalances. Note: a positive bias means we are
@@ -139,7 +141,7 @@ class MotorController:
         self.error_left = self.target_mm_left - self.mm_left
         self.error_right = self.target_mm_right - self.mm_right
 
-        # calculate duties
+        # calculate duties # TODO: ADD INTEGRAL TERM IN CASE WE GET STUCK
         self.duty_left = self.output(self.target_mm_left, self.error_left)
         self.duty_right = self.output(self.target_mm_right, self.error_right)
 
