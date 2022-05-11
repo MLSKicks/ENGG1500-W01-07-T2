@@ -1,7 +1,5 @@
 from vehicle_components import Vehicle
-from time import ticks_ms, ticks_diff, sleep_ms
-from enum import Enum
-
+from time import sleep_ms  # ticks_ms, ticks_diff,
 
 # - - - - - - - - - - - - - - - - - - - - - - - RANDOM STUFF - - - - - - - - - - - - - - - - - - - - - - - - - -#
 ascii_cat = ("State: PRINT_ART\n\n    _,,/|\n"
@@ -13,21 +11,20 @@ ascii_cat = ("State: PRINT_ART\n\n    _,,/|\n"
 
 
 # - - - - - - - - - - - - - - - - - - - - - - - STATE ENUMERATION - - - - - - - - - - - - - - - - - - - - - - - #
-class State(Enum):
-    NULL = -1
-    SPLASH_SCREEN = 0
-    PRINT_ROAD_INFO = 1
-    IDLE = 2
-    STOP = 3
-    HAZARD = 4
-    LF_FWD = 5
-    LF_TURN_LEFT = 6
-    LF_TURN_RIGHT = 7
+NULL = -1
+SPLASH_SCREEN = 0
+PRINT_ROAD_INFO = 1
+IDLE = 2
+STOP = 3
+HAZARD = 4
+LF_FWD = 5
+LF_TURN_LEFT = 6
+LF_TURN_RIGHT = 7
 
 
 # - - - - - - - - - - - - - - - - - - - - - - - STATE VARIABLES - - - - - - - - - - - - - - - - - - - - - - - - #
-prev_state = State.NULL
-state = State.NULL
+prev_state = NULL
+state = NULL
 is_transition = False
 
 
@@ -43,29 +40,54 @@ def update_state_variables():
 def print_state(screen):
     """Print out what state we are in"""
     if is_transition:  # Run this ONCE when we have just entered a new state -> avoids flickering
-        if state == State.NULL:
+        if state == NULL:
             screen.print("State: NULL\n\nNo initial state\nwas specified!")
-        elif state == State.SPLASH_SCREEN:
+        elif state == SPLASH_SCREEN:
             screen.print_art(ascii_cat)
-        elif state == State.PRINT_ROAD_INFO:
+        elif state == PRINT_ROAD_INFO:
             screen.print("State: Road Info")
-        elif state == State.IDLE:
+        elif state == IDLE:
             screen.print("State: Idling\n\nI am lost!")
-        elif state == State.STOP:
+        elif state == STOP:
             screen.print("State: Stopped\n\nMy job is done!")
-        elif state == State.HAZARD:
+        elif state == HAZARD:
             screen.print("State: Hazard\n\nSomething got in\n my way!")
-        elif state == State.LF_FWD:
+        elif state == LF_FWD:
             screen.print("State: Line Foll\n-owing")
-        elif state == State.LF_TURN_LEFT:
+        elif state == LF_TURN_LEFT:
             screen.print("State: Line Foll\n-owing LEFT")
-        elif state == State.LF_TURN_RIGHT:
+        elif state == LF_TURN_RIGHT:
             screen.print("State: Line Foll\n-owing RIGHT")
         else:
             screen.print("State: Not Found")
 
 
-def main(initial_state=State.NULL):
+def set_initial_targets(pid):
+    """Sets the initial targets for each state"""
+    if is_transition:  # Run this ONCE when we have just entered a new state -> otherwise pid control will break
+        if state == NULL:
+            pid.set_target(0, 0)
+        elif state == SPLASH_SCREEN:
+            pid.set_target(0, 0)
+        elif state == PRINT_ROAD_INFO:
+            pid.set_target(0, 0)
+        elif state == IDLE:
+            pid.set_target(0, 0)
+        elif state == STOP:
+            pid.set_target(0, 0)
+        elif state == HAZARD:
+            pid.set_target(0, 0)
+        elif state == LF_FWD:
+            pid.set_target(50, 50)
+        elif state == LF_TURN_LEFT:
+            pid.set_target(50, 100)
+        elif state == LF_TURN_RIGHT:
+            pid.set_target(100, 50)
+        else:
+            pid.set_target(0, 0)
+
+
+def main(initial_state=NULL):
     """This is our main state machine: a big loop that performs actions based on the current state!
 
     Initialisation: initialise our Vehicle object which initialises objects for each sensor, controller, etc.
@@ -76,6 +98,7 @@ def main(initial_state=State.NULL):
     are reacting to things like obstacles on the road, in which case we want to stop ASAP!
 
     State Machine Body: goes through all the nitty-gritty details """
+
     global prev_state, state, is_transition, ascii_cat
 
     # - - - - - - - - - - - - - - - - - - - - - - - INITIALISATION - - - - - - - - - - - - - - - - - - - - - - - #
@@ -96,45 +119,63 @@ def main(initial_state=State.NULL):
         us_r = vehicle.us_r.proximity()
 
         # - - - - - - - - - - - - - - - - - - - - GLOBAL TRANSITIONS - - - - - - - - - - - - - - - - - - - - #
-        if rgb_prox < 35:  # Something is on the road or obstructing the sensor... so lets stop
-            state = State.HAZARD
+        if rgb_prox < 35:         # Something is on the road or obstructing the sensor -> so lets stop
+            state = HAZARD
 
         # - - - - - - - - - - - - - - - - - - - - STATE MACHINE HEADER - - - - - - - - - - - - - - - - - - - #
-        update_state_variables()
-        print_state(screen)
+        update_state_variables()  # Updates prev_state and is_transition flag
+        print_state(screen)       # Prints current state information if we just transitioned
+        set_initial_targets(pid)  # Sets our PID targets if we just transitioned
 
         # - - - - - - - - - - - - - - - - - - - - STATE MACHINE BODY - - - - - - - - - - - - - - - - - - - - #
-        if state == State.SPLASH_SCREEN:
-            if is_transition:
-                pid.set_target(0, 0)
+        # - SPLASH_SCREEN -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
+        # Prints a cat to the screen for a second
+        if state == SPLASH_SCREEN:  # TODO: Implement second delay
+            pass
 
-        elif state == State.PRINT_ROAD_INFO:
+        # - PRINT_ROAD_INFO -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
+        # Displays what our IR/RGB sensors are saying about the road
+        elif state == PRINT_ROAD_INFO:
             screen.print_variable("IR-L Road{!s:>7}\n"
                                   "IR-R Road{!s:>7}\n"
                                   "RGB Road{!s:>8}\n"
                                   "RGB Amb{:9d}\n"
                                   "RGB Hue{:9d}\n"
-                                  "RGB Prox{:8d}".format(ir_l_onroad, ir_r_onroad, rgb_onroad, ambient, rgb_hue, rgb_prox),
+                                  "RGB Prox{:8d}".format(ir_l_onroad, ir_r_onroad, rgb_onroad,
+                                                         ambient, rgb_hue, rgb_prox),
                                   0, 2)
+
+        # - IDLE -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
+        # If we are lost, we go into idle and wander around
+        elif state == IDLE:  # TODO: Smarter idle wandering
+            if pid.target_met():
+                pid.set_target(50, 50)
+
+        # - STOP -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
+        # Stop once we have finished our task
+        elif state == STOP:  # TODO: How does user ask vehicle to go again after finishing track?
             if is_transition:
                 pid.set_target(0, 0)
 
-        elif state == State.IDLE:
-            if is_transition or pid.target_met():
+        # - HAZARD -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
+        # Stop if we encounter a hazard on the road
+        elif state == HAZARD:  # TODO: How do we react to a hazard? Stop? Go Around?
+            pass
+
+        # - LF_FWD -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
+        # Line-Follow-Forward attempts to follow straight or slightly bendy lines
+        elif state == LF_FWD:  # TODO: Fix Line Following
+            # If we finished our target, just go again
+            if pid.target_met():
                 pid.set_target(50, 50)
 
-        elif state == State.STOP:
-            if is_transition:
-                pid.set_target(0, 0)
-
-        elif state == State.LF_FWD:
-            if is_transition or pid.target_met:
-                pid.set_target(50, 50)
-            # Adjust for slight veers left/right off the road
-            if ir_l_onroad and not ir_r_onroad:  # we have veered right
+            # Adjust for slight veers rightwards off the road -> by veering left
+            if ir_l_onroad and not ir_r_onroad:
                 screen.print("State: LF_FWD\nveering right")
                 pid.add_target(-15, 15)
-            if not ir_l_onroad and ir_r_onroad:  # we have veered left
+
+            # Adjust for slight veers leftwards off the road -> by veering right
+            if not ir_l_onroad and ir_r_onroad:
                 screen.print("State: LF_FWD\nveering left")
                 pid.add_target(15, -15)
 
@@ -153,70 +194,72 @@ def test_pid(target_mm_l, target_mm_r, kp, ki, kd, loops=30, sleep=50):
 
 
 def run_pid(vehicle, left_target, right_target, n=1):
-    # divide the targets into n steps or segments
+    # Divide the targets into n steps or segments
     left_target_step = left_target/n
     right_target_step = right_target/n
 
-    # set our initial target
-    vehicle.pid.reset_target(left_target_step, right_target_step)
+    # Set our initial target
+    vehicle.pid.set_target(left_target_step, right_target_step)
 
-    # once each step is done, add the next step, until we are done!
+    # Once each step is done, add the next step. Loop until we are done!
     for i in range(0, n, 1):
         while not vehicle.pid.target_met():
-            lduty, rduty = vehicle.pid.run()
-            vehicle.set_motor(lduty, rduty)
-            sleep_ms(50)
+            vehicle.set_motor(*vehicle.pid.run())
+
         vehicle.pid.add_target(left_target_step, right_target_step)
 
-    # done, so stop motors
+    # Done, so stop motors
     vehicle.set_motor(0, 0)
 
 
-def gentle_curve(turn_left=False, turn_right=False):
-    vehicle = Vehicle(motor=True, enc=True, screen=True)
-    # direction True = turn left
+def gentle_curve(vehicle, turn_left=False, turn_right=False):
+    """ Travel around the gentle curve track piece, in either the left or right direction"""
     if turn_left:
         vehicle.screen.print("Gentle Curve\n\nTurning left")
         run_pid(vehicle, 300, 500, 3)
 
-    # direction False = turn right
     if turn_right:
         vehicle.screen.print("Gentle Curve\n\nTurning right")
         run_pid(vehicle, 500, 300, 3)
 
-    vehicle.screen.print("Done :)")
 
+def roundabout(vehicle, exit_):
+    """ Take an any exit on the roundabout track piece! We must first ensure 1 <= exit_ <= 4, then:
+            1 -> turn left
+            2 -> travel forward
+            3 -> turn right
+            4 -> U-turn """
 
-def roundabout(about_exit):
-    # exit must be between 0 - 3: 0 is U-turn, 1 is left, 2 is fwd, 3 is right
-    about_exit = (about_exit % 4)
-    if about_exit == 0:
-        about_exit = 4  # make it travel all the way around
-    vehicle = Vehicle(motor=True, enc=True, screen=True)
+    # Ensure that exit_ is a valid exit
+    exit_ = (exit_ % 4)
+    if exit_ == 0:
+        exit_ = 4
 
-    # travel onto roundabout
+    # Travel onto the roundabout
     vehicle.screen.print("Round About\n\nGetting on")
     run_pid(vehicle, 40, 40)
     run_pid(vehicle, -80, 80)
 
-    for i in range(0, about_exit, 1):
-        # complete the quarter turn
-        vehicle.screen.print("Round About\n\nTravelling around {}/{}".format(i, about_exit))
-        run_pid(vehicle, 245, 15)  # 434, 214 * 0.75 then hand tuned
+    for i in range(0, exit_, 1):
+        # Complete a quarter turn
+        vehicle.screen.print("Round About\n\nTravelling around {}/{}".format(i, exit_))
+        run_pid(vehicle, 245, 15)
 
-    # travel off roundabout
+    # Travel out of the roundabout
     vehicle.screen.print("Round About\n\nGetting off")
     run_pid(vehicle, -90, 90)
 
-    vehicle.screen.print("Done :)")
-
 
 if __name__ == "__main__":
-    sleep_ms(500)
-    roundabout(2)
+    v = Vehicle(motor=True, enc=True, screen=True)
 
-    sleep_ms(2000)
-    gentle_curve(turn_right=True)
+    sleep_ms(1000)
+    roundabout(v, exit_=2)
 
-    sleep_ms(2000)
-    main(State.LF_FWD)
+    sleep_ms(1000)
+    gentle_curve(v, turn_right=True)
+
+    del v
+
+    sleep_ms(1000)
+    main(LF_FWD)
