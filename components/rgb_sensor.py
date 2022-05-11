@@ -60,7 +60,7 @@ class RGB:
         if prox <= 1:
             return 500
         else:
-            return log((prox - 1)/255)/(-0.062)
+            return int(log((prox - 1)/255)/(-0.062))
 
     def proximity(self):
         """return proximity level"""
@@ -122,6 +122,6 @@ class RGB:
         return False
 
     def is_on_road_by_prox(self):
-        if self.proximity() <= 1:
+        if self.proximity() <= 4:
             return True
         return False

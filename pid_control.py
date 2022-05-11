@@ -73,7 +73,7 @@ class PIDController:
         # derivative on output (motor duty) option
         self.d_on_o = False
 
-    def reset_target(self, target_mm_left, target_mm_right):
+    def set_target(self, target_mm_left, target_mm_right):
         """Reset PID control with a new target"""
         self.__init__(self.encoder, target_mm_left, target_mm_right)
 

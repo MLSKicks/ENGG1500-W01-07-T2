@@ -38,30 +38,41 @@ class Screen:
         self.oled.text(message, col*_CHAR_WIDTH, row*_CHAR_HEIGHT, colour)
         self.oled.show()
 
+    def print_variable(self, message, col, row):
+        """Print a message in a space that must be cleared first. This is useful for printing
+        *variable* data that is constantly updating. Has '\n' support, but note that col will
+        always stay the same. E.g. if you specify a col of 4, each line will start at col 4.
+        Finally, be careful as lines that are too long will run off! Finally, FINALLY, be careful
+        of artifacts left if variables are not always constant width"""
+        lines = message.split('\n')
+        for i in range(0, len(lines)):
+            self.oled.fill_rect(col*_CHAR_WIDTH, (row+i)*_CHAR_HEIGHT, len(lines[i])*_CHAR_WIDTH, 1*_CHAR_HEIGHT, 0)
+            self.oled.text(lines[i], col*_CHAR_WIDTH, (row+i)*_CHAR_HEIGHT, 1)
+        self.oled.show()
+
     def print(self, message):
-        """
-            Fits a message onto the screen by breaking words apart without mercy.
-            Note that print will overwrite any previous prints. Also note that a
-            message that is too long is cut off! Now has '\n' support!
-            :type message: str
-        """
+        """ TODO: These prints are taking ~100ms. Is this function too inefficient?
+        Fits a message onto the screen by breaking words apart without mercy.
+        Note that print will overwrite any previous prints. Also note that a
+        message that is too long is cut off! Now has '\n' support!
+            :type message: str"""
         self.clear()
         row = 0
         col = 0
         i = 0
         cur_line = ""
         while i < len(message):
-            if col >= _COL_SIZE:  # print each complete row and then increment to the next row
-                self.oled.text(cur_line, 0, row * _CHAR_HEIGHT)
-                row += 1
-                col = 0
-                cur_line = ""
-            elif message[i] == '\n':  # handle newlines correctly
+            if message[i] == '\n':  # handle newlines correctly
                 self.oled.text(cur_line, 0, row * _CHAR_HEIGHT)
                 row += 1
                 col = 0
                 cur_line = ""
                 i += 1
+            elif col >= _COL_SIZE:  # print each complete row and then increment to the next row
+                self.oled.text(cur_line, 0, row * _CHAR_HEIGHT)
+                row += 1
+                col = 0
+                cur_line = ""
             else:  # buffer the message
                 if (cur_line != "") or (message[i] != " "):  # skip any whitespaces beginning a newline
                     cur_line += message[i]
@@ -70,11 +81,9 @@ class Screen:
         self.oled.text(cur_line, 0, row*_CHAR_HEIGHT)
         self.oled.show()
 
-    def print_ascii_art(self, message):
-        """
-            Same as print but preserves whitespace
-            :type message: str
-        """
+    def print_art(self, message):
+        """Same as print but preserves whitespace
+            :type message: str"""
         self.clear()
         row = 0
         col = 0
