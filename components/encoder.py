@@ -40,8 +40,14 @@ class EncoderClicker(object):
     def set_left_dir(self, dir_bool):
         self.left_fwd = dir_bool
 
+    def left_dir_is_fwd(self):
+        return self.left_fwd
+
     def set_right_dir(self, dir_bool):
         self.right_fwd = dir_bool
+
+    def right_dir_is_fwd(self):
+        return self.right_fwd
 
     def get_left(self):
         return self._count_left

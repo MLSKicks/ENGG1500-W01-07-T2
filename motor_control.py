@@ -26,43 +26,38 @@ def clamp(duty, max_duty, min_duty):
 
 class MotorController:
     def __init__(self, encoder, target_mm_left=0, target_mm_right=0, amplitude=32.5, offset=1.2, base_duty=30, bias=5):
-        """initialise all PID controller constants, variables, and encoder object"""
-        # initialise target and encoder object
+        """Initialise all controller constants, variables, and encoder object"""
+        # Initialise encoder
+        self.encoder = encoder      # Set the encoder object
+        self.encoder.clear_count()  # Make sure the encoder is zero'd
+
+        # Set encoder polarity: True for travelling forwards, False for travelling backwards
+        self.encoder.set_left_dir(target_mm_left >= 0)
+        self.encoder.set_right_dir(target_mm_right >= 0)
+        self.toggle_left_enc, self.toggle_right_enc = False, False  # These flags indicate a request to toggle polarity
+
+        # Initialise working variables for our control functions
         self.target_mm_left = target_mm_left
         self.target_mm_right = target_mm_right
-        self.encoder = encoder
-        self.target_tolerance = 11
-
-        # encoder polarity is true for a forwards/zero target, and false for a backwards target
-        encoder_polarity_left = self.target_mm_left >= 0
-        encoder_polarity_right = self.target_mm_right >= 0
-        self.encoder.clear_count()
-        self.encoder.set_left_dir(encoder_polarity_left)
-        self.encoder.set_right_dir(encoder_polarity_right)
-        self.enc_left_is_fwd, self.enc_right_is_fwd = encoder_polarity_left, encoder_polarity_right
-        self.toggle_left_enc = False
-        self.toggle_right_enc = False
-
-        self.t0 = ticks_ms()
-        self.dt = 0
-
-        # initialise variables for PID control
-        self.mm_left, self.mm_right = 0, 0
-        self.error_left, self.error_right = target_mm_left, target_mm_right
+        self.target_tolerance = 11  # Once we are within _ mm, we are done!
+        self.mm_left, self.mm_right = 0, 0  # Current distance travelled
+        self.error_left, self.error_right = target_mm_left, target_mm_right  # How far we are from out target
         self.prev_error_left, self.prev_error_right = 0, 0
         self.duty_left, self.duty_right = 0, 0
+        self.t0 = ticks_ms()
+        self.dt = 0
+        self.max_duty = 75  # This is the max duty we are allowed to produce
+        self.min_duty = -75  # This is the min duty we are allowed to produce
+        self.bias = bias  # Correcting motor imbalances
+        self.integral_count_left, self.integral_count_right = 0, 0
 
-        # constants for output calculations
+        # Constants for output calculations
         self.amplitude = amplitude
         self.base_duty = base_duty  # This is the baseline duty value
         self.offset_amount = offset
 
-        # clamp and bias constants
-        self.max_duty = 75
-        self.min_duty = -75
-        self.bias = bias
-
     def reset(self, target_mm_left, target_mm_right, amplitude, offset, base_duty, bias):
+        """Reset the whole class with new values"""
         self.__init__(self.encoder, target_mm_left, target_mm_right, amplitude, offset, base_duty, bias)
 
     def set_target(self, target_mm_left, target_mm_right):
@@ -70,6 +65,7 @@ class MotorController:
         self.__init__(self.encoder, target_mm_left, target_mm_right)
 
     def add_target(self, target_mm_left, target_mm_right):
+        """Artificially add to our targets... TODO: This will not work well without a 'boost'"""
         self.target_mm_left += target_mm_left
         self.target_mm_right += target_mm_right
 
@@ -83,39 +79,44 @@ class MotorController:
     def target_met(self):
         """Checks if the target has been met"""
         target_met = True
-
         if not (-self.target_tolerance <= self.error_left <= self.target_tolerance):
             target_met = False
-
         if not (-self.target_tolerance <= self.error_right <= self.target_tolerance):
             target_met = False
-
         return target_met
 
-    def output(self, target, error):
+    def output(self, target, error, prev_error, integral_count):
         """Create the output function w.r.t error. This function is a bell curve,
         with amplitude dependent on the size of the target."""
         print("Target = {}, error = {}, ".format(target, error), end="")
-        if target == 0:
+
+        # If the target is already met, we do nothing
+        if -self.target_tolerance >= error >= self.target_tolerance:
             return 0
 
-        if -self.target_tolerance >= error >= self.target_tolerance:  # if target is already met, do nothing
-            return 0
-
-        if error > 0:  # find out which direction to go
+        # Find out which direction we are going
+        if error > 0:
             polarity = 1
         else:
             polarity = -1
 
-        if target < 0:  # Ensure target is positive, its just how the maths works
-            target = -target
-
-        # Do the actual calculation
+        # Do the actual calculation, this is a 'proportional term'
+        target = abs(target)  # This is required for how the maths is working atm
         amplitude = self.amplitude * atan(target/150)
         width = -1 / target ** 1.5
         offset = target / self.offset_amount
         print("amplitude = {}, width = {}, offset = {}, offset_amount = {}".format(amplitude, width, offset, self.offset_amount))
-        return polarity * (amplitude * exp(width * (polarity*error - offset) ** 2) + self.base_duty)
+        duty = polarity * (amplitude * exp(width * (polarity*error - offset) ** 2) + self.base_duty)
+
+        # In case we get stuck at one spot, add an 'integral term'
+        if abs(prev_error - error) <= 5:
+            print("adding some integral term!")
+            duty += integral_count % 10
+            integral_count += 1
+        else:
+            integral_count = 0
+
+        return integral_count, duty
 
     def duty_correction(self):
         """Fix bias to correct the motor imbalances. Note: a positive bias means we are
@@ -132,20 +133,22 @@ class MotorController:
         """Calculates the error terms and PID values"""
         self.update_elapsed_time()
 
-        # save old errors for integral section
+        # Save old errors for integral section
         self.prev_error_left = self.error_left
         self.prev_error_right = self.error_right
 
-        # calculate current error
+        # Calculate current error
         self.mm_left, self.mm_right = clicks_to_mm(self.encoder.get_left()), clicks_to_mm(self.encoder.get_right())
         self.error_left = self.target_mm_left - self.mm_left
         self.error_right = self.target_mm_right - self.mm_right
 
-        # calculate duties # TODO: ADD INTEGRAL TERM IN CASE WE GET STUCK
-        self.duty_left = self.output(self.target_mm_left, self.error_left)
-        self.duty_right = self.output(self.target_mm_right, self.error_right)
+        # Calculate duties
+        self.integral_count_left, self.duty_left = \
+            self.output(self.target_mm_left, self.error_left, self.prev_error_left, self.integral_count_left)
+        self.integral_count_right, self.duty_right = \
+            self.output(self.target_mm_right, self.error_right, self.prev_error_right, self.integral_count_right)
 
-        # clamp duties
+        # Clamp duties
         self.duty_left = clamp(self.duty_left, self.max_duty, self.min_duty)
         self.duty_right = clamp(self.duty_right, self.max_duty, self.min_duty)
 
@@ -154,28 +157,25 @@ class MotorController:
         however, we need to stop the vehicle first since the encoder will count backwards
         while it is still travelling forwards due to inertia. We will therefore overwrite the
         duties to zero while we are awaiting a change in the encoder direction"""
-        # check for polarity change in left duty
+        # Check for polarity change in left duty
         if not self.toggle_left_enc:
-            if self.duty_left > 0 and not self.enc_left_is_fwd:
-                print("switching encoder polarity l->fwd")
-                self.toggle_left_enc = True
-                self.enc_left_is_fwd = True
-            elif self.duty_left < 0 and self.enc_left_is_fwd:
-                print("switching encoder polarity l->bkwd")
-                self.toggle_left_enc = True
-                self.enc_left_is_fwd = False
+            if self.duty_left > 0 and not self.encoder.left_dir_is_fwd():
+                print("Switching encoder polarity l->fwd")
+                self.toggle_left_enc = True  # Queue a polarity change to forwards
+            elif self.duty_left < 0 and self.encoder.left_dir_is_fwd():
+                print("Switching encoder polarity l->bkwd")
+                self.toggle_left_enc = True  # Queue a polarity change to backwards
 
-        # check for polarity change in right duty
+        # Check for polarity change in right duty
         if not self.toggle_right_enc:
-            if self.duty_right > 0 and not self.enc_right_is_fwd:
-                print("switching encoder polarity r->fwd")
-                self.toggle_right_enc = True
-                self.enc_right_is_fwd = True
-            elif self.duty_right < 0 and self.enc_right_is_fwd:
-                print("switching encoder polarity r->bkwd")
-                self.toggle_right_enc = True
-                self.enc_right_is_fwd = False
+            if self.duty_right > 0 and not self.encoder.right_dir_is_fwd():
+                print("Switching encoder polarity r->fwd")
+                self.toggle_right_enc = True  # Queue a polarity change to forwards
+            elif self.duty_right < 0 and self.encoder.right_dir_is_fwd():
+                print("Switching encoder polarity r->bkwd")
+                self.toggle_right_enc = True  # Queue a polarity change to backwards
 
+        # If a polarity change is requested, do it once the vehicle is stationary
         if self.toggle_left_enc:
             # overwrite any duties
             self.duty_left = 0
@@ -184,6 +184,7 @@ class MotorController:
                 self.encoder.toggle_left_dir()
                 self.toggle_left_enc = False
 
+        # If a polarity change is requested, do it once the vehicle is stationary
         if self.toggle_right_enc:
             # overwrite any duties
             self.duty_right = 0
