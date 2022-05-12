@@ -224,6 +224,7 @@ def run(vehicle, left_target, right_target):
 
 def gentle_curve(vehicle, turn_left=True):
     """Travel around the gentle curve track piece, in either the left or right direction"""
+    vehicle.screen.print("State*: Gentle C-urve")
     if turn_left:  # Do the turn
         run(vehicle, 309, 529)
     else:
@@ -236,7 +237,7 @@ def roundabout(vehicle, exit_):
             2 -> travel forward
             3 -> turn right
             4 -> U-turn """
-
+    vehicle.screen.print("State*: Round Ab-out")
     exit_ = (exit_ % 4)  # Ensure that exit_ is a valid exit
     if exit_ == 0:
         exit_ = 4
@@ -251,11 +252,13 @@ def roundabout(vehicle, exit_):
 
 def distracting_line(vehicle):
     """Complete the distracting line track piece"""
+    vehicle.screen.print("State*: Distract-ing Lines")
     run(vehicle, 297, 297)
 
 
 def fork(vehicle, turn_left=True):
     """Complete the fork, turning left if turn_left=True or right if turn_left=False"""
+    vehicle.screen.print("State*: Fork")
     run(vehicle, 35, 35)  # Lead in
     if turn_left:
         run(vehicle, 70, 290)
@@ -266,6 +269,7 @@ def fork(vehicle, turn_left=True):
 
 def corner(vehicle, turn_left=True):
     """Complete the corner, turning left if turn_left=True or right if turn_left=False"""
+    vehicle.screen.print("State*: Corner")
     run(vehicle, 148, 148)
     if turn_left:
         run(vehicle, -110, 110)  # Rotate 90 degrees left
@@ -275,17 +279,20 @@ def corner(vehicle, turn_left=True):
 
 
 def straight(vehicle):
+    vehicle.screen.print("State*: Straight")
     """Complete the straight track piece"""
     run(vehicle, 297, 297)
 
 
 def hallway(vehicle):
     """Complete the converging or parallel hallway"""
+    vehicle.screen.print("State*: Hallway")
     run(vehicle, 594, 594)
 
 
 def curve_road(vehicle, reverse_direction=False):
     """Complete the special bendy piece"""
+    vehicle.screen.print("State*: Curvey")
     if reverse_direction:
         run(vehicle, 297, 52)  # Travel in a big circle clockwise 100 degrees
         run(vehicle, 39, 479)  # Travel in a big circle anti-clockwise 180 degrees
@@ -300,6 +307,7 @@ def curve_road(vehicle, reverse_direction=False):
 
 def dead_end(vehicle, facing_dead_end=True):
     """Complete the dead end piece"""
+    vehicle.screen.print("State*: Dead End")
     # TODO dead_end
     if facing_dead_end:
         pass
@@ -309,6 +317,7 @@ def dead_end(vehicle, facing_dead_end=True):
 
 def sharp_bend(vehicle, reverse_direction=False):
     """Complete the sharp bend piece"""
+    vehicle.screen.print("State*: Sharp Be-nd")
     # TODO sharp_bend
     if reverse_direction:
         pass
