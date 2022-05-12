@@ -206,7 +206,8 @@ def test_controller(target_mm_l, target_mm_r, amplitude, offset, base_duty, bias
     vehicle.set_motor(0, 0)
 
 
-def run(vehicle, left_target, right_target, n=1):
+def run(vehicle, left_target, right_target):
+    """Complete a target using motor_control"""
     # Set our target
     vehicle.controller.set_target(left_target, right_target)
 
@@ -218,54 +219,134 @@ def run(vehicle, left_target, right_target, n=1):
     vehicle.set_motor(0, 0)
 
 
-def gentle_curve(vehicle, turn_left=False, turn_right=False):
-    """ Travel around the gentle curve track piece, in either the left or right direction"""
-    if turn_left:
-        vehicle.screen.print("Gentle Curve\n\nTurning left")
-        run(vehicle, 300, 500)
-
-    if turn_right:
-        vehicle.screen.print("Gentle Curve\n\nTurning right")
-        run(vehicle, 500, 300)
+def gentle_curve(vehicle, turn_left=True):
+    """Travel around the gentle curve track piece, in either the left or right direction"""
+    if turn_left:  # Do the turn
+        run(vehicle, 309, 529)
+    else:
+        run(vehicle, 529, 309)
 
 
 def roundabout(vehicle, exit_):
-    """ Take an any exit on the roundabout track piece! We must first ensure 1 <= exit_ <= 4, then:
+    """Take an any exit on the roundabout track piece! We must first ensure 1 <= exit_ <= 4, then:
             1 -> turn left
             2 -> travel forward
             3 -> turn right
             4 -> U-turn """
 
-    # Ensure that exit_ is a valid exit
-    exit_ = (exit_ % 4)
+    exit_ = (exit_ % 4)  # Ensure that exit_ is a valid exit
     if exit_ == 0:
         exit_ = 4
 
-    # Travel onto the roundabout
-    vehicle.screen.print("Round About\n\nGetting on")
-    run(vehicle, 100, 100)
-    run(vehicle, -130, 130)
+    run(vehicle, 45, 45)           # Lead in
+    run(vehicle, -110, 110)        # Turn onto the roundabout
+    for i in range(0, exit_, 1):   # Complete a quarter turn exit_ times
+        run(vehicle, 271, 52)
+    run(vehicle, -110, 110)        # Travel out of the roundabout
+    run(vehicle, 45, 45)           # Lead out
 
-    for i in range(0, exit_, 1):
-        # Complete a quarter turn
-        vehicle.screen.print("Round About\n\nTravelling around {}/{}".format(i, exit_))
-        run(vehicle, 267, 31)
 
-    # Travel out of the roundabout
-    vehicle.screen.print("Round About\n\nGetting off")
-    run(vehicle, -130, 130)
+def distracting_line(vehicle):
+    """Complete the distracting line track piece"""
+    run(vehicle, 297, 297)
+
+
+def fork(vehicle, turn_left=True):
+    """Complete the fork, turning left if turn_left=True or right if turn_left=False"""
+    run(vehicle, 35, 35)  # Lead in
+    if turn_left:
+        run(vehicle, 70, 290)
+    else:
+        run(vehicle, 290, 70)
+    run(vehicle, 35, 35)  # Lead out
+
+
+def corner(vehicle, turn_left=True):
+    """Complete the corner, turning left if turn_left=True or right if turn_left=False"""
+    run(vehicle, 148, 148)
+    if turn_left:
+        run(vehicle, -110, 110)  # Rotate 90 degrees left
+    else:
+        run(vehicle, 110, -110)  # Rotate 90 degrees right
+    run(vehicle, 148, 148)
+
+
+def straight(vehicle):
+    """Complete the straight track piece"""
+    run(vehicle, 297, 297)
+
+
+def hallway(vehicle):
+    """Complete the converging or parallel hallway"""
+    run(vehicle, 594, 594)
+
+
+def curve_road(vehicle, reverse_direction=False):
+    """Complete the special bendy piece"""
+    if reverse_direction:
+        run(vehicle, 297, 52)  # Travel in a big circle clockwise 100 degrees
+        run(vehicle, 39, 479)  # Travel in a big circle anti-clockwise 180 degrees
+        run(vehicle, 180, 180)  # Go straight for a bit
+        run(vehicle, 55, -55)  # Rotate -45 degrees
+    else:
+        run(vehicle, -55, 55)  # Rotate 45 degrees
+        run(vehicle, 180, 180)  # Go straight for a bit
+        run(vehicle, 479, 39)   # Travel in a big circle clockwise 180 degrees
+        run(vehicle, 52, 297)   # Travel in a big circle anti-clockwise 100 degrees
+
+
+def dead_end(vehicle, facing_dead_end=True):
+    """Complete the dead end piece"""
+    # TODO dead_end
+    if facing_dead_end:
+        pass
+    else:
+        pass
+
+
+def sharp_bend(vehicle, reverse_direction=False):
+    """Complete the sharp bend piece"""
+    # TODO sharp_bend
+    if reverse_direction:
+        pass
+    else:
+        pass
+
+
+def complete_basic_track():
+    """Complete the basic track, let's get at least a pass!"""
+    vehicle = Vehicle(motor=True, enc=True, screen=True)
+
+    # Get to 2 roundabouts
+    gentle_curve(vehicle, turn_left=True)
+    straight(vehicle)
+    roundabout(vehicle, 2)
+    straight(vehicle)
+    fork(vehicle, turn_left=True)
+    gentle_curve(vehicle, turn_left=False)
+    gentle_curve(vehicle, turn_left=False)
+    fork(vehicle, turn_left=True)
+    distracting_line(vehicle)
+    roundabout(vehicle, 4)
+
+    # Get back home
+    distracting_line(vehicle)
+    fork(vehicle, turn_left=True)
+    dead_end(vehicle, facing_dead_end=False)
+    distracting_line(vehicle)
+    curve_road(vehicle, reverse_direction=False)
+    fork(vehicle, turn_left=True)
+    straight(vehicle)
+    roundabout(vehicle, 2)
+    straight(vehicle)
+    gentle_curve(vehicle, turn_left=False)
 
 
 if __name__ == "__main__":
     v = Vehicle(motor=True, enc=True, screen=True)
 
     sleep_ms(1000)
-    roundabout(v, exit_=2)
-
-    sleep_ms(1000)
-    gentle_curve(v, turn_right=True)
-
-    del v
+    complete_basic_track()
 
     sleep_ms(1000)
     main(SPLASH_SCREEN)
