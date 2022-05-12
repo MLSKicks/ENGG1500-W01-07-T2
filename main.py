@@ -29,6 +29,7 @@ is_transition = False    # Transition flag telling us if we just switched states
 t0 = ticks_ms()          # For calculating time spent in a state
 
 
+# - - - - - - - - - - - - - - - - - - - - - STATE MACHINE FUNCTIONS - - - - - - - - - - - - - - - - - - - - - - - #
 def update_state_variables():
     """Updates our previous state (prev_state) variable and transition flag (is_transition).
     The transition flag tells us if we have just transitioned to a new state. This is helpful
@@ -98,6 +99,7 @@ def elapsed_ms():
     return ticks_diff(ticks_ms(), t0)
 
 
+# - - - - - - - - - - - - - - - - - - - - - - - STATE MACHINE - - - - - - - - - - - - - - - - - - - - - - - - #
 def main(initial_state=NULL):
     """This is our main state machine: a big loop that performs actions based on the current state!
 
@@ -196,6 +198,7 @@ def main(initial_state=NULL):
         vehicle.set_motor(*controller.run())
 
 
+# - - - - - - - - - - - - - - - - - - - - MOTOR CONTROLLER METHODS - - - - - - - - - - - - - - - - - - - - - - #
 def test_controller(target_mm_l, target_mm_r, amplitude, offset, base_duty, bias=3, loops=30, sleep=50):
     """Test different proportionality constants for controller"""
     vehicle = Vehicle(screen=True, enc=True, motor=True)
@@ -343,8 +346,6 @@ def complete_basic_track():
 
 
 if __name__ == "__main__":
-    v = Vehicle(motor=True, enc=True, screen=True)
-
     sleep_ms(1000)
     complete_basic_track()
 
