@@ -1,6 +1,7 @@
 from vehicle_components import Vehicle
 from time import sleep_ms, ticks_ms, ticks_diff
 
+# TODO: TRACK DISTORTED BY 1.33x ????
 # - - - - - - - - - - - - - - - - - - - - - - - RANDOM STUFF - - - - - - - - - - - - - - - - - - - - - - - - - -#
 ascii_cat = ("State: PRINT_ART\n\n    _,,/|\n"
              "    \\o o'\n"
@@ -222,13 +223,35 @@ def run(vehicle, left_target, right_target):
     vehicle.set_motor(0, 0)
 
 
+def run2(vehicle, left_target, right_target, divisions):
+    # Divide the targets into n steps or segments
+    left_target_step = left_target / divisions
+    right_target_step = right_target / divisions
+
+    # Set our initial target
+    vehicle.controller.set_target(left_target_step, right_target_step)
+
+    # Once each step is done, add the next step. Loop until we are done!
+    for i in range(0, divisions, 1):
+        while not vehicle.controller.target_met():
+            vehicle.set_motor(*vehicle.controller.run())
+
+        # vehicle.pid.add_target(left_target_step, right_target_step)
+        vehicle.controller.set_target(left_target_step, right_target_step)
+
+    # Done, so stop motors
+    vehicle.set_motor(0, 0)
+
+
 def gentle_curve(vehicle, turn_left=True):
     """Travel around the gentle curve track piece, in either the left or right direction"""
     vehicle.screen.print("State*: Gentle C-urve")
     if turn_left:  # Do the turn
-        run(vehicle, 309, 529)
+        #run2(vehicle, 309, 529, 3)
+        run2(vehicle, 345, 565, 3)
     else:
-        run(vehicle, 529, 309)
+        #run2(vehicle, 529, 309, 3)
+        run2(vehicle, 565, 345, 3)
 
 
 def roundabout(vehicle, exit_):
@@ -245,7 +268,7 @@ def roundabout(vehicle, exit_):
     run(vehicle, 45, 45)           # Lead in
     run(vehicle, -110, 110)        # Turn onto the roundabout
     for i in range(0, exit_, 1):   # Complete a quarter turn exit_ times
-        run(vehicle, 271, 52)
+        run2(vehicle, 271, 52, 2)
     run(vehicle, -110, 110)        # Travel out of the roundabout
     run(vehicle, 45, 45)           # Lead out
 
@@ -281,7 +304,8 @@ def corner(vehicle, turn_left=True):
 def straight(vehicle):
     vehicle.screen.print("State*: Straight")
     """Complete the straight track piece"""
-    run(vehicle, 297, 297)
+    #run(vehicle, 297, 297)
+    run(vehicle, 367, 367)
 
 
 def hallway(vehicle):

@@ -35,7 +35,7 @@ class MotorController:
         2. Wheel diameter is 65 mm -> 40 clicks = pi*65 mm
         3. The output function"""
 
-    def __init__(self, encoder, target_mm_left=0, target_mm_right=0, amplitude=32.5, offset=1.2, base_duty=30, bias=5):
+    def __init__(self, encoder, target_mm_left=0, target_mm_right=0, amplitude=33, offset=1.2, base_duty=32, bias=3):
         """Initialise all controller constants, variables, and encoder object."""
         # Initialise encoder
         self.encoder = encoder      # Save the encoder object
@@ -150,9 +150,27 @@ class MotorController:
 
     def duty_correction(self):
         """Fix bias to correct the motor imbalances. A positive bias means we are
-        increasing power to the left motor, and decreasing power to the right motor
+        increasing power to the left motor, and decreasing power to the right motor.
+        New addition: if the percentage completion of one side is greater than the other,
+        try correct that as well!
         #TODO: A better solution may be using different constants in the output function?"""
-        return int(self.duty_left + self.bias), int(self.duty_right - self.bias)
+        lduty = self.duty_left
+        rduty = self.duty_right
+
+        # Find percentage completion of both sides
+        completion_left = self.mm_left / self.target_mm_left
+        completion_right = self.mm_right / self.target_mm_right
+        difference = completion_left - completion_right
+
+        # If difference is out by too much, correct
+        if difference > 0.1:
+            print("Adding bonus to right side")
+            rduty += difference*25
+        elif difference < -0.1:
+            print("Adding bonus to left side")
+            lduty += -difference*25
+
+        return int(lduty + self.bias), int(rduty - self.bias)
 
     def update_elapsed_time(self):
         """Calculates the elapsed time, dt, since the last call. Also resets self.t0"""
