@@ -34,8 +34,8 @@ class MotorController:
         1. Wheels are not slipping
         2. Wheel diameter is 65 mm -> 40 clicks = pi*65 mm
         3. The output function"""
-
-    def __init__(self, encoder, target_mm_left=0, target_mm_right=0, amplitude=25, offset=1.2, base_duty=28, bias=5):
+    # a = 25, of = 1.2, base = 28, bias = 5
+    def __init__(self, encoder, target_mm_left=0, target_mm_right=0, amplitude=25, offset=1.2, base_duty=32, bias=3):
         """Initialise all controller constants, variables, and encoder object."""
         # Initialise encoder
         self.encoder = encoder      # Save the encoder object
@@ -121,51 +121,31 @@ class MotorController:
         # - - - - - - - - - - - - - - - - - Calculate the Duty Value - - - - - - - - - - - - - - - - - #
         # Calculate the amplitudes of the bell curve. A bigger target == a bigger amplitude, however we limit the
         # amplitude to around 50 by using the inverse tan function
-        l_amplitude = self.amplitude * atan(l_target/100)
-        r_amplitude = self.amplitude * atan(r_target/100)
+        l_amplitude = self.amplitude * atan(l_target/125)
+        r_amplitude = self.amplitude * atan(r_target/125)
 
         # Calculate the 'width' of the bell curve. A bigger target means a flatter bell curve that stays
         # at a higher speed for longer. We want this flattening to decrease with target, so we use an inverse function
         if l_target == 0:
             l_width = 0
         else:
-            l_width = 1 / l_target**1.6
+            l_width = 1 / l_target**1.5
 
         if r_target == 0:
             r_width = 0
         else:
-            r_width = 1 / r_target**1.6
-
-        if r_target > l_target:
-            l_width = 1/2*(l_width + r_width)
-        if l_target > r_target:
-            r_width = 1/2*(l_width + r_width)
+            r_width = 1 / r_target**1.5
 
         # Calculate the 'offset' of our bell curve. This allows us to concentrate higher speeds at the start
         # of our trip, such that we have sufficient time to slow down and stop at the target (countering overshooting)
         l_offset = max(l_target, r_target) / self.offset_amount
-        r_offset = max(r_target, l_target) / self.offset_amount
-
-        # shift offsets a little towards each other to help with curves
-        # l_offset = 3/4*l_offset + 1/4*r_offset
-        # r_offset = 3/4*r_offset + 1/4*l_offset
+        r_offset = max(l_target, r_target) / self.offset_amount
 
         # Finally, calculate the actual duty!
         self.duty_left = l_polarity * (l_amplitude * exp(-l_width * (l_polarity * self.error_left - l_offset) ** 2)
                                        + self.base_duty)
         self.duty_right = r_polarity * (r_amplitude * exp(-r_width * (r_polarity * self.error_right - r_offset) ** 2)
                                         + self.base_duty)
-
-        # print("Left: target={}, err={}, amplitude={}, width={}, offset={}".format(self.target_mm_left,
-        #                                                                           self.error_left,
-        #                                                                           l_amplitude,
-        #                                                                           l_width,
-        #                                                                           l_offset))
-        # print("Right: target={}, err={}, amplitude={}, width={}, offset={}".format(self.target_mm_right,
-        #                                                                            self.error_right,
-        #                                                                            r_amplitude,
-        #                                                                            r_width,
-        #                                                                            r_offset))
 
     def get_unstuck(self):
         """In case we get stuck, slowly add more power"""
@@ -200,33 +180,33 @@ class MotorController:
         lduty = self.duty_left
         rduty = self.duty_right
 
-        # # Find percentage completion of both sides
-        # if self.target_mm_left == 0:
-        #     completion_left = 0
-        # else:
-        #     completion_left = abs(self.mm_left / self.target_mm_left)
-        #
-        # if self.target_mm_right == 0:
-        #     completion_right = 0
-        # else:
-        #     completion_right = abs(self.mm_right / self.target_mm_right)
-        #
-        # difference = completion_left - completion_right
-        #
-        # # Get polarity
-        # l_polarity, r_polarity = 1, 1
-        # if lduty < 0:
-        #     l_polarity = -1
-        # if rduty < 0:
-        #     r_polarity = -1
-        #
-        # # If difference is out by too much, correct
-        # if difference > 0.1:
-        #     print("Adding bonus to right side")
-        #     rduty += l_polarity * difference * 10
-        # elif difference < -0.1:
-        #     print("Adding bonus to left side")
-        #     lduty += r_polarity * -difference * 10
+        # Find percentage completion of both sides
+        if self.target_mm_left == 0:
+            completion_left = 0
+        else:
+            completion_left = abs(self.mm_left / self.target_mm_left)
+
+        if self.target_mm_right == 0:
+            completion_right = 0
+        else:
+            completion_right = abs(self.mm_right / self.target_mm_right)
+
+        difference = completion_left - completion_right
+
+        # Get polarity
+        l_polarity, r_polarity = 1, 1
+        if lduty < 0:
+            l_polarity = -1
+        if rduty < 0:
+            r_polarity = -1
+
+        # If difference is out by too much, correct
+        if difference > 0.1:
+            print("Adding bonus to right side")
+            rduty += l_polarity * difference * 5
+        elif difference < -0.1:
+            print("Adding bonus to left side")
+            lduty += r_polarity * -difference * 5
 
         return int(lduty + self.bias), int(rduty - self.bias)
 
