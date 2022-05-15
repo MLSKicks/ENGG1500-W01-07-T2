@@ -21,6 +21,16 @@ HAZARD = 4
 LF_FWD = 5
 LF_TURN_LEFT = 6
 LF_TURN_RIGHT = 7
+PATH_STRAIGHT = 100
+PATH_GENTLE_CURVE = 101
+PATH_ROUNDABOUT = 102
+PATH_DISTRACTING_LINE = 103
+PATH_FORK = 104
+PATH_CORNER = 105
+PATH_HALLWAY = 106
+PATH_CURVEY_ROAD = 107
+PATH_DEAD_END = 108
+PATH_SHARP_BEND = 109
 
 
 # - - - - - - - - - - - - - - - - - - - - - - - STATE VARIABLES - - - - - - - - - - - - - - - - - - - - - - - - #
@@ -28,6 +38,14 @@ prev_state = NULL        # Previous state
 state = NULL             # Current state
 is_transition = False    # Transition flag telling us if we just switched states
 t0 = ticks_ms()          # For calculating time spent in a state
+
+# Special state variables for the path state
+LEFT = False
+RIGHT = True
+path_state_turn = LEFT
+path_state_exit = 0
+path_state_phase = 0
+default_track_counter = 0
 
 
 # - - - - - - - - - - - - - - - - - - - - - STATE MACHINE FUNCTIONS - - - - - - - - - - - - - - - - - - - - - - - #
@@ -64,40 +82,78 @@ def print_state(screen):
             screen.print("State: Line Foll\n-owing LEFT")
         elif state == LF_TURN_RIGHT:
             screen.print("State: Line Foll\n-owing RIGHT")
+        elif state == PATH_STRAIGHT:
+            screen.print("State: Path Stra\n-ight")
+        elif state == PATH_GENTLE_CURVE:
+            screen.print("State: Path Gent\n-le Curve")
+        elif state == PATH_ROUNDABOUT:
+            screen.print("State: Path Roun\n-about")
+        elif state == PATH_DISTRACTING_LINE:
+            screen.print("State: Distracti\n-ng Lines")
+        elif state == PATH_FORK:
+            screen.print("State: Fork")
+        elif state == PATH_CORNER:
+            screen.print("State: Corner")
+        elif state == PATH_HALLWAY:
+            screen.print("State: Hallway")
+        elif state == PATH_CURVEY_ROAD:
+            screen.print("State: Curvey Ro\nad")
+        elif state == PATH_DEAD_END:
+            screen.print("State: Dead End")
+        elif state == PATH_SHARP_BEND:
+            screen.print("State: Sharp Ben\n-d")
         else:
             screen.print("State: Not Found")
-
-
-def set_initial_targets(controller):
-    """Sets the initial targets for each state"""
-    global state, is_transition
-    if is_transition:  # Run this ONCE when we have just entered a new state -> otherwise motor controller will break
-        # if state == NULL:
-        #     controller.set_target(0, 0)
-        # elif state == SPLASH_SCREEN:
-        #     controller.set_target(0, 0)
-        # elif state == PRINT_ROAD_INFO:
-        #     controller.set_target(0, 0)
-        # elif state == IDLE:
-        #     controller.set_target(0, 0)
-        # elif state == STOP:
-        #     controller.set_target(0, 0)
-        # elif state == HAZARD:
-        #     controller.set_target(0, 0)
-        if state == LF_FWD:
-            controller.set_target(50, 50)
-        elif state == LF_TURN_LEFT:
-            controller.set_target(50, 100)
-        elif state == LF_TURN_RIGHT:
-            controller.set_target(100, 50)
-        else:
-            controller.set_target(0, 0)
 
 
 def elapsed_ms():
     """Calculates the elapsed ms in the current state, relies on update_state_variables()"""
     global t0
     return ticks_diff(ticks_ms(), t0)
+
+
+def default_track_next_state():
+    global path_state_turn, path_state_exit, path_state_phase, default_track_counter, LEFT, RIGHT
+
+    path_state_turn = LEFT
+    path_state_exit = 0
+    path_state_phase = 0
+
+    track_states = [
+        (PATH_GENTLE_CURVE, LEFT),
+        PATH_STRAIGHT,
+        (PATH_ROUNDABOUT, 2),
+        PATH_STRAIGHT,
+        (PATH_FORK, LEFT),
+        (PATH_GENTLE_CURVE, RIGHT),
+        (PATH_GENTLE_CURVE, RIGHT),
+        (PATH_FORK, LEFT),
+        PATH_DISTRACTING_LINE,
+        (PATH_ROUNDABOUT, 4),
+        PATH_DISTRACTING_LINE,
+        (PATH_FORK, LEFT),
+        (PATH_DEAD_END, False),
+        PATH_DISTRACTING_LINE,
+        (PATH_CURVEY_ROAD, False),
+        (PATH_FORK, LEFT),
+        PATH_STRAIGHT,
+        (PATH_ROUNDABOUT, 2),
+        PATH_STRAIGHT,
+        (PATH_GENTLE_CURVE, RIGHT)
+    ]
+
+    if type(track_states[default_track_counter]) is tuple:
+        next_state = track_states[default_track_counter][0]
+        if next_state == PATH_GENTLE_CURVE or next_state == PATH_FORK:
+            path_state_turn = track_states[default_track_counter][1]
+        elif next_state == PATH_ROUNDABOUT:
+            path_state_exit = track_states[default_track_counter][1]
+    else:
+        next_state = track_states[default_track_counter]
+
+    default_track_counter += 1
+    sleep_ms(250)
+    return next_state
 
 
 # - - - - - - - - - - - - - - - - - - - - - - - STATE MACHINE - - - - - - - - - - - - - - - - - - - - - - - - #
@@ -113,13 +169,15 @@ def main(initial_state=NULL):
 
     State Machine Body: goes through all the nitty-gritty details """
 
-    global prev_state, state, is_transition, ascii_cat, t0
+    global prev_state, state, is_transition, ascii_cat, t0, LEFT, RIGHT, path_state_turn, \
+        path_state_exit, path_state_phase
 
     # - - - - - - - - - - - - - - - - - - - - - - - INITIALISATION - - - - - - - - - - - - - - - - - - - - - - - #
     vehicle = Vehicle(motor=True, enc=True, screen=True, rgb=True, ir_l=True, ir_r=True, us_l=True, us_r=True)
     controller = vehicle.controller          # Get motor control object -> can set duties to achieve desired targets
     screen = vehicle.screen    # Get OLED screen object -> can print useful information
     state = initial_state      # Set the requested initial state
+    sf = 1                     # Scale Factor for road stretching
 
     while True:
         # - - - - - - - - - - - - - - - - - - - - SENSOR DATA COLLECTION - - - - - - - - - - - - - - - - - - #
@@ -140,18 +198,23 @@ def main(initial_state=NULL):
         # - - - - - - - - - - - - - - - - - - - - STATE MACHINE HEADER - - - - - - - - - - - - - - - - - - - #
         update_state_variables()  # Updates prev_state and is_transition flag
         print_state(screen)       # Prints current state information if we just transitioned
-        set_initial_targets(controller)  # Sets our controller targets if we just transitioned
 
         # - - - - - - - - - - - - - - - - - - - - STATE MACHINE BODY - - - - - - - - - - - - - - - - - - - - #
         # - SPLASH_SCREEN -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
         # Prints a cat to the screen for a second
         if state == SPLASH_SCREEN:
+            if is_transition:
+                controller.set_target(0, 0)
+
             if elapsed_ms() > 1000:
                 state = PRINT_ROAD_INFO
 
         # - PRINT_ROAD_INFO -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
         # Displays what our IR/RGB sensors are saying about the road
         elif state == PRINT_ROAD_INFO:
+            if is_transition:
+                controller.set_target(0, 0)
+
             screen.print_variable("IR-L Road{!s:>7}\n"
                                   "IR-R Road{!s:>7}\n"
                                   "RGB Road{!s:>8}\n"
@@ -161,10 +224,13 @@ def main(initial_state=NULL):
                                                          ambient, rgb_hue, rgb_prox),
                                   0, 2)
 
+            if elapsed_ms() > 1000:
+                state = default_track_next_state()
+
         # - IDLE -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
         # If we are lost, we go into idle and wander around
         elif state == IDLE:  # TODO: Smarter idle wandering
-            if controller.target_met():
+            if is_transition or controller.target_met():
                 controller.set_target(50, 50)
 
         # - STOP -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
@@ -176,13 +242,14 @@ def main(initial_state=NULL):
         # - HAZARD -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
         # Stop if we encounter a hazard on the road
         elif state == HAZARD:  # TODO: How do we react to a hazard? Stop? Go Around?
-            pass
+            if is_transition:
+                controller.set_target(0, 0)
 
         # - LF_FWD -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
         # Line-Follow-Forward attempts to follow straight or slightly bendy lines
         elif state == LF_FWD:  # TODO: Fix Line Following
             # If we finished our target, just go again
-            if controller.target_met():
+            if is_transition or controller.target_met():
                 controller.set_target(50, 50)
 
             # Adjust for slight veers rightwards off the road -> by veering left
@@ -195,16 +262,104 @@ def main(initial_state=NULL):
                 screen.print("State: LF_FWD\nveering left")
                 controller.add_target(15, -15)
 
+        # - PATH -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
+        elif state == PATH_STRAIGHT:
+            # set target for travel
+            if is_transition:
+                controller.set_target(297*sf, 297*sf)
+            # state transition
+            if controller.target_met():
+                state = default_track_next_state()
+
+        elif state == PATH_GENTLE_CURVE:
+            # set target for travel
+            if is_transition:
+                if path_state_turn == LEFT:
+                    controller.set_target(309, 525)
+                else:
+                    controller.set_target(525, 309)
+            # state transition
+            if controller.target_met():
+                state = default_track_next_state()
+
+        elif state == PATH_ROUNDABOUT:
+            if is_transition or controller.target_met():
+                if path_state_phase == 0:  # turn onto roundabout
+                    controller.set_target(-110, 110)
+                elif path_state_phase == 1:  # travel around roundabout
+                    if path_state_exit > 0:
+                        controller.set_target(260, 40)  # perform a quarter turn
+                        path_state_exit -= 1  # count off each quarter turn
+                        path_state_phase -= 1  # stop state phase from incrementing until finished
+                elif path_state_phase == 2:  # turn off roundabout
+                    controller.set_target(-110, 110)
+                else:  # state transition
+                    state = default_track_next_state()
+                # increment roundabout phase
+                path_state_phase += 1
+
+        elif state == PATH_DISTRACTING_LINE:
+            # set target
+            if is_transition:
+                controller.set_target(297, 297)
+            # state transition
+            if controller.target_met():
+                state = default_track_next_state()
+
+        elif state == PATH_FORK:
+            # set target
+            if is_transition:
+                if path_state_turn == LEFT:
+                    controller.set_target(70, 290)
+                else:
+                    controller.set_target(290, 70)
+            # state transition
+            if controller.target_met():
+                state = default_track_next_state()
+
+        elif state == PATH_CORNER:
+            if is_transition or controller.target_met():
+                if path_state_phase == 0:  # travel forwards
+                    controller.set_target(148, 148)
+                elif path_state_phase == 1 and path_state_turn == LEFT:  # make a corner turn left
+                    controller.set_target(-100, 100)
+                elif path_state_phase == 1 and path_state_turn == RIGHT:  # make a corner turn right
+                    controller.set_target(100, -100)
+                elif path_state_phase == 2:  # travel forwards
+                    controller.set_target(148, 148)
+                else:  # state transition
+                    state = default_track_next_state()
+                # increment corner phase
+                path_state_phase += 1
+
+        elif state == PATH_HALLWAY:
+            # set target
+            if is_transition:
+                controller.set_target(594, 594)
+            # state transition
+            if controller.target_met():
+                state = default_track_next_state()
+
+        elif state == PATH_CURVEY_ROAD:
+            pass
+
+        elif state == PATH_DEAD_END:
+            pass
+
+        elif state == PATH_SHARP_BEND:
+            pass
+
         # - - - - - - - - - - - - - - - - - - - - CONTROL MOTORS - - - - - - - - - - - - - - - - - - - - #
         vehicle.set_motor(*controller.run())
 
 
 # - - - - - - - - - - - - - - - - - - - - MOTOR CONTROLLER METHODS - - - - - - - - - - - - - - - - - - - - - - #
+
 def test_controller(target_mm_l, target_mm_r, amplitude, offset, base_duty, bias=3, loops=30, sleep=50):
     """Test different proportionality constants for controller"""
     vehicle = Vehicle(screen=True, enc=True, motor=True)
     vehicle.controller.reset(target_mm_l, target_mm_r, amplitude, offset, base_duty, bias)
-    for i in range(0, loops):
+    while not vehicle.controller.target_met():
         vehicle.set_motor(*vehicle.controller.run())
         sleep_ms(sleep)
     vehicle.set_motor(0, 0)
@@ -245,13 +400,12 @@ def run2(vehicle, left_target, right_target, divisions):
 
 def gentle_curve(vehicle, turn_left=True):
     """Travel around the gentle curve track piece, in either the left or right direction"""
+    global sf
     vehicle.screen.print("State*: Gentle C-urve")
     if turn_left:  # Do the turn
-        #run2(vehicle, 309, 529, 3)
-        run2(vehicle, 345, 565, 3)
+        run2(vehicle, 309, 525, 2)
     else:
-        #run2(vehicle, 529, 309, 3)
-        run2(vehicle, 565, 345, 3)
+        run2(vehicle, 525, 309, 2)
 
 
 def roundabout(vehicle, exit_):
@@ -265,12 +419,14 @@ def roundabout(vehicle, exit_):
     if exit_ == 0:
         exit_ = 4
 
-    run(vehicle, 45, 45)           # Lead in
+    # run(vehicle, 45, 45)           # Lead in
     run(vehicle, -110, 110)        # Turn onto the roundabout
+    sleep_ms(200)
     for i in range(0, exit_, 1):   # Complete a quarter turn exit_ times
-        run2(vehicle, 271, 52, 2)
+        run(vehicle, 260, 40)
+        sleep_ms(200)
     run(vehicle, -110, 110)        # Travel out of the roundabout
-    run(vehicle, 45, 45)           # Lead out
+    # run(vehicle, 45, 45)           # Lead out
 
 
 def distracting_line(vehicle):
@@ -284,9 +440,9 @@ def fork(vehicle, turn_left=True):
     vehicle.screen.print("State*: Fork")
     run(vehicle, 35, 35)  # Lead in
     if turn_left:
-        run(vehicle, 70, 290)
+        run2(vehicle, 70, 290, 2)
     else:
-        run(vehicle, 290, 70)
+        run2(vehicle, 290, 70, 2)
     run(vehicle, 35, 35)  # Lead out
 
 
@@ -295,17 +451,17 @@ def corner(vehicle, turn_left=True):
     vehicle.screen.print("State*: Corner")
     run(vehicle, 148, 148)
     if turn_left:
-        run(vehicle, -110, 110)  # Rotate 90 degrees left
+        run(vehicle, -100, 100)  # Rotate 90 degrees left
     else:
-        run(vehicle, 110, -110)  # Rotate 90 degrees right
+        run(vehicle, 100, -100)  # Rotate 90 degrees right
     run(vehicle, 148, 148)
 
 
 def straight(vehicle):
     vehicle.screen.print("State*: Straight")
     """Complete the straight track piece"""
-    #run(vehicle, 297, 297)
-    run(vehicle, 367, 367)
+    run(vehicle, 297, 297)
+    # run(vehicle, 367, 367)
 
 
 def hallway(vehicle):
@@ -355,32 +511,50 @@ def complete_basic_track():
 
     # Get to 2 roundabouts
     gentle_curve(vehicle, turn_left=True)
+    sleep_ms(200)
     straight(vehicle)
+    sleep_ms(200)
     roundabout(vehicle, 2)
+    sleep_ms(200)
     straight(vehicle)
+    sleep_ms(200)
     fork(vehicle, turn_left=True)
+    sleep_ms(200)
     gentle_curve(vehicle, turn_left=False)
+    sleep_ms(200)
     gentle_curve(vehicle, turn_left=False)
+    sleep_ms(200)
     fork(vehicle, turn_left=True)
+    sleep_ms(200)
     distracting_line(vehicle)
+    sleep_ms(200)
     roundabout(vehicle, 4)
 
     # Get back home
     distracting_line(vehicle)
+    sleep_ms(200)
     fork(vehicle, turn_left=True)
+    sleep_ms(200)
     dead_end(vehicle, facing_dead_end=False)
+    sleep_ms(200)
     distracting_line(vehicle)
+    sleep_ms(200)
     curve_road(vehicle, reverse_direction=False)
+    sleep_ms(200)
     fork(vehicle, turn_left=True)
+    sleep_ms(200)
     straight(vehicle)
+    sleep_ms(200)
     roundabout(vehicle, 2)
+    sleep_ms(200)
     straight(vehicle)
+    sleep_ms(200)
     gentle_curve(vehicle, turn_left=False)
+    sleep_ms(200)
 
 
 if __name__ == "__main__":
-    sleep_ms(1000)
-    complete_basic_track()
+    # sleep_ms(1000)
+    # complete_basic_track()
 
-    sleep_ms(1000)
     main(SPLASH_SCREEN)

@@ -35,7 +35,7 @@ class MotorController:
         2. Wheel diameter is 65 mm -> 40 clicks = pi*65 mm
         3. The output function"""
 
-    def __init__(self, encoder, target_mm_left=0, target_mm_right=0, amplitude=33, offset=1.2, base_duty=32, bias=3):
+    def __init__(self, encoder, target_mm_left=0, target_mm_right=0, amplitude=25, offset=1.2, base_duty=28, bias=5):
         """Initialise all controller constants, variables, and encoder object."""
         # Initialise encoder
         self.encoder = encoder      # Save the encoder object
@@ -75,7 +75,7 @@ class MotorController:
         """Calculates the pwm values using a closed feedback loop"""
         self.update_duty()
         self.update_encoder()
-        self.print_csv_data()
+        # self.print_csv_data()
         return self.duty_correction()
 
     def reset(self, target_mm_left, target_mm_right, amplitude, offset, base_duty, bias):
@@ -87,9 +87,10 @@ class MotorController:
         self.__init__(self.encoder, target_mm_left, target_mm_right)
 
     def add_target(self, target_mm_left, target_mm_right):
-        """Artificially add to our targets... TODO: This will not work well without a 'boost'"""
-        self.target_mm_left += target_mm_left
-        self.target_mm_right += target_mm_right
+        """Reset with a new target, but holding onto the old error"""
+        self.__init__(self.encoder, target_mm_left+self.error_left, target_mm_right+self.error_right)
+        # self.target_mm_left += target_mm_left
+        # self.target_mm_right += target_mm_right
 
     def target_met(self):
         """Checks if the target has been met within a certain tolerance
@@ -102,51 +103,93 @@ class MotorController:
             target_met = False
         return target_met
 
-    def output(self, target, error, prev_error, stuck_count):
-        """Create the output function w.r.t our current error. This function is a bell curve,
-        with amplitude dependent on the size of the target, and offset so that we go faster
-        when we are further away."""
-        # If the target is already met, we do nothing
-        if -self.target_tolerance >= error >= self.target_tolerance:
-            return 0
+    def get_duties(self):
+        """Create the output function w.r.t our current errors. This function creates a bell curve,
+        with amplitude dependent on the size of the target, and an offset so that we go faster when we are
+        further away from our target. version 2: calculates for left and right"""
+        # - - - - - - - - - - - - - - - - - - Set Up - - - - - - - - - - - - - - - - - - #
+        # Find out which direction the wheels need to turn
+        l_polarity, r_polarity = 1, 1
+        if self.error_left < 0:
+            l_polarity = -1
+        if self.error_right < 0:
+            r_polarity = -1
 
-        # - - - - - - - - - - Find the duty value - - - - - - - - - - #
-        # Find out which direction we need to travel
-        if error > 0:
-            polarity = 1
+        # Get the absolute value of our targets, now that we know what directions we are going
+        l_target, r_target = abs(self.target_mm_left), abs(self.target_mm_right)
+
+        # - - - - - - - - - - - - - - - - - Calculate the Duty Value - - - - - - - - - - - - - - - - - #
+        # Calculate the amplitudes of the bell curve. A bigger target == a bigger amplitude, however we limit the
+        # amplitude to around 50 by using the inverse tan function
+        l_amplitude = self.amplitude * atan(l_target/100)
+        r_amplitude = self.amplitude * atan(r_target/100)
+
+        # Calculate the 'width' of the bell curve. A bigger target means a flatter bell curve that stays
+        # at a higher speed for longer. We want this flattening to decrease with target, so we use an inverse function
+        if l_target == 0:
+            l_width = 0
         else:
-            polarity = -1
+            l_width = 1 / l_target**1.6
 
-        # Ensure target is positive
-        target = abs(target)
+        if r_target == 0:
+            r_width = 0
+        else:
+            r_width = 1 / r_target**1.6
 
-        # Calculate the amplitude of our bell curve. We want a bigger amplitude when the target is bigger,
-        #    but we want this to limit towards 50. Thus, we use the inverse tan function
-        amplitude = self.amplitude * atan(target/150)
-
-        # Calculate the 'width' of our bell curve. A bigger smaller means a flatter bell curve that stays
-        #   at a higher speed for longer. We want this to decrease with target, so we use an inverse function
-        width = 1 / target ** 1.5
+        if r_target > l_target:
+            l_width = 1/2*(l_width + r_width)
+        if l_target > r_target:
+            r_width = 1/2*(l_width + r_width)
 
         # Calculate the 'offset' of our bell curve. This allows us to concentrate higher speeds at the start
-        #   of our trip, so that we have sufficient time to slow down and stop at our target
-        offset = target / self.offset_amount
+        # of our trip, such that we have sufficient time to slow down and stop at the target (countering overshooting)
+        l_offset = max(l_target, r_target) / self.offset_amount
+        r_offset = max(r_target, l_target) / self.offset_amount
 
-        # Calculate the actual duty!
-        duty = polarity * (amplitude * exp(-width * (polarity*error - offset) ** 2) + self.base_duty)
+        # shift offsets a little towards each other to help with curves
+        # l_offset = 3/4*l_offset + 1/4*r_offset
+        # r_offset = 3/4*r_offset + 1/4*l_offset
 
-        # - - - - - - - - - - In case we get stuck, slowly add more power - - - - - - - - - - #
-        if abs(prev_error - error) <= 5:
-            print("Trying to get unstuck {}: ".format(stuck_count), end="")
-            duty += stuck_count / 10
-            stuck_count += 1
+        # Finally, calculate the actual duty!
+        self.duty_left = l_polarity * (l_amplitude * exp(-l_width * (l_polarity * self.error_left - l_offset) ** 2)
+                                       + self.base_duty)
+        self.duty_right = r_polarity * (r_amplitude * exp(-r_width * (r_polarity * self.error_right - r_offset) ** 2)
+                                        + self.base_duty)
+
+        # print("Left: target={}, err={}, amplitude={}, width={}, offset={}".format(self.target_mm_left,
+        #                                                                           self.error_left,
+        #                                                                           l_amplitude,
+        #                                                                           l_width,
+        #                                                                           l_offset))
+        # print("Right: target={}, err={}, amplitude={}, width={}, offset={}".format(self.target_mm_right,
+        #                                                                            self.error_right,
+        #                                                                            r_amplitude,
+        #                                                                            r_width,
+        #                                                                            r_offset))
+
+    def get_unstuck(self):
+        """In case we get stuck, slowly add more power"""
+        l_polarity, r_polarity = 1, 1
+
+        if abs(self.prev_error_left - self.error_left) <= 5:
+            # print("Trying to get left unstuck {}: ".format(self.stuck_count_left))
+            self.stuck_count_left += 1
         else:
-            stuck_count = 0
+            self.stuck_count_left = max(self.stuck_count_left-0.5, 0)
 
-        # - - - - - - - - - - Print helpful stats - - - - - - - - - - #
-        print("Target={}, err={}, amplitude={}, width={}, offset={}".format(target, error, amplitude, width, offset))
+        if abs(self.prev_error_right - self.error_right) <= 5:
+            # print("Trying to get right unstuck {}: ".format(self.stuck_count_right))
+            self.stuck_count_right += 1
+        else:
+            self.stuck_count_right = max(self.stuck_count_right-0.5, 0)
 
-        return stuck_count, duty
+        if self.error_left < 0:
+            l_polarity = -1
+        if self.error_right < 0:
+            r_polarity = -1
+
+        self.duty_left += l_polarity * self.stuck_count_left * 2
+        self.duty_right += r_polarity * self.stuck_count_right * 2
 
     def duty_correction(self):
         """Fix bias to correct the motor imbalances. A positive bias means we are
@@ -157,18 +200,33 @@ class MotorController:
         lduty = self.duty_left
         rduty = self.duty_right
 
-        # Find percentage completion of both sides
-        completion_left = self.mm_left / self.target_mm_left
-        completion_right = self.mm_right / self.target_mm_right
-        difference = completion_left - completion_right
-
-        # If difference is out by too much, correct
-        if difference > 0.1:
-            print("Adding bonus to right side")
-            rduty += difference*25
-        elif difference < -0.1:
-            print("Adding bonus to left side")
-            lduty += -difference*25
+        # # Find percentage completion of both sides
+        # if self.target_mm_left == 0:
+        #     completion_left = 0
+        # else:
+        #     completion_left = abs(self.mm_left / self.target_mm_left)
+        #
+        # if self.target_mm_right == 0:
+        #     completion_right = 0
+        # else:
+        #     completion_right = abs(self.mm_right / self.target_mm_right)
+        #
+        # difference = completion_left - completion_right
+        #
+        # # Get polarity
+        # l_polarity, r_polarity = 1, 1
+        # if lduty < 0:
+        #     l_polarity = -1
+        # if rduty < 0:
+        #     r_polarity = -1
+        #
+        # # If difference is out by too much, correct
+        # if difference > 0.1:
+        #     print("Adding bonus to right side")
+        #     rduty += l_polarity * difference * 10
+        # elif difference < -0.1:
+        #     print("Adding bonus to left side")
+        #     lduty += r_polarity * -difference * 10
 
         return int(lduty + self.bias), int(rduty - self.bias)
 
@@ -192,10 +250,15 @@ class MotorController:
         self.error_right = self.target_mm_right - self.mm_right
 
         # Calculate duties
-        self.stuck_count_left, self.duty_left = \
-            self.output(self.target_mm_left, self.error_left, self.prev_error_left, self.stuck_count_left)
-        self.stuck_count_right, self.duty_right = \
-            self.output(self.target_mm_right, self.error_right, self.prev_error_right, self.stuck_count_right)
+        # If the target is met within the tolerance, we are done!
+        if self.target_mm_left == 0 and self.target_mm_right == 0:
+            self.duty_left, self.duty_right = 0, 0
+        elif -self.target_tolerance >= self.error_left >= self.target_tolerance\
+                and -self.target_tolerance >= self.error_right >= self.target_tolerance:
+            self.duty_left, self.duty_right = 0, 0
+        else:
+            self.get_duties()
+            self.get_unstuck()
 
         # Clamp duties
         self.duty_left = clamp(self.duty_left, self.max_duty, self.min_duty)
@@ -209,19 +272,19 @@ class MotorController:
         # Check for polarity change in left duty
         if not self.toggle_left_enc:
             if self.duty_left > 0 and not self.encoder.left_dir_is_fwd():
-                print("Switching encoder polarity l->fwd")
+                # print("Switching encoder polarity l->fwd")
                 self.toggle_left_enc = True  # Queue a polarity change to forwards
             elif self.duty_left < 0 and self.encoder.left_dir_is_fwd():
-                print("Switching encoder polarity l->bkwd")
+                # print("Switching encoder polarity l->bkwd")
                 self.toggle_left_enc = True  # Queue a polarity change to backwards
 
         # Check for polarity change in right duty
         if not self.toggle_right_enc:
             if self.duty_right > 0 and not self.encoder.right_dir_is_fwd():
-                print("Switching encoder polarity r->fwd")
+                # print("Switching encoder polarity r->fwd")
                 self.toggle_right_enc = True  # Queue a polarity change to forwards
             elif self.duty_right < 0 and self.encoder.right_dir_is_fwd():
-                print("Switching encoder polarity r->bkwd")
+                # print("Switching encoder polarity r->bkwd")
                 self.toggle_right_enc = True  # Queue a polarity change to backwards
 
         # If a polarity change is requested, do it once the vehicle is stationary
@@ -245,3 +308,49 @@ class MotorController:
     def print_csv_data(self):
         """prints out csv data with headings dt, left_duty, left_clicks, right_duty, right_clicks"""
         print("{},{},{},{},{}".format(self.dt, self.duty_left, self.mm_left, self.duty_right, self.mm_right))
+
+    # def output(self, target, error, prev_error, stuck_count):
+    #     """Create the output function w.r.t our current error. This function is a bell curve,
+    #     with amplitude dependent on the size of the target, and offset so that we go faster
+    #     when we are further away."""
+    #     # If the target is already met, we do nothing
+    #     if -self.target_tolerance >= error >= self.target_tolerance:
+    #         return 0
+    #
+    #     # - - - - - - - - - - Find the duty value - - - - - - - - - - #
+    #     # Find out which direction we need to travel
+    #     if error > 0:
+    #         polarity = 1
+    #     else:
+    #         polarity = -1
+    #
+    #     # Ensure target is positive
+    #     target = abs(target)
+    #
+    #     # Calculate the amplitude of our bell curve. We want a bigger amplitude when the target is bigger,
+    #     #    but we want this to limit towards 50. Thus, we use the inverse tan function
+    #     amplitude = self.amplitude * atan(target/150)
+    #
+    #     # Calculate the 'width' of our bell curve. A bigger smaller means a flatter bell curve that stays
+    #     #   at a higher speed for longer. We want this to decrease with target, so we use an inverse function
+    #     width = 1 / target ** 1.5
+    #
+    #     # Calculate the 'offset' of our bell curve. This allows us to concentrate higher speeds at the start
+    #     #   of our trip, so that we have sufficient time to slow down and stop at our target
+    #     offset = target / self.offset_amount
+    #
+    #     # Calculate the actual duty!
+    #     duty = polarity * (amplitude * exp(-width * (polarity*error - offset) ** 2) + self.base_duty)
+    #
+    #     # - - - - - - - - - - In case we get stuck, slowly add more power - - - - - - - - - - #
+    #     if abs(prev_error - error) <= 5:
+    #         print("Trying to get unstuck {}: ".format(stuck_count), end="")
+    #         duty += stuck_count / 10
+    #         stuck_count += 1
+    #     else:
+    #         stuck_count = 0
+    #
+    #     # - - - - - - - - - - Print helpful stats - - - - - - - - - - #
+    #     print("Target={}, err={}, amplitude={}, width={}, offset={}".format(target, error, amplitude, width, offset))
+    #
+    #     return stuck_count, duty
