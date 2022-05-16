@@ -113,7 +113,7 @@ def elapsed_ms():
 
 
 def default_track_next_state():
-    global path_state_turn, path_state_exit, path_state_phase, default_track_counter, LEFT, RIGHT
+    global state, prev_state, path_state_turn, path_state_exit, path_state_phase, default_track_counter, LEFT, RIGHT
 
     path_state_turn = LEFT
     path_state_exit = 0
@@ -131,11 +131,15 @@ def default_track_next_state():
         PATH_DISTRACTING_LINE,
         (PATH_ROUNDABOUT, 4),
         PATH_DISTRACTING_LINE,
-        (PATH_FORK, LEFT),
-        (PATH_DEAD_END, False),
-        PATH_DISTRACTING_LINE,
-        (PATH_CURVEY_ROAD, False),
-        (PATH_FORK, LEFT),
+        (PATH_FORK, RIGHT),
+        (PATH_GENTLE_CURVE, LEFT),
+        (PATH_GENTLE_CURVE, LEFT),
+        (PATH_FORK, RIGHT),
+        # (PATH_FORK, LEFT),
+        # (PATH_DEAD_END, False),
+        # PATH_DISTRACTING_LINE,
+        # (PATH_CURVEY_ROAD, False),
+        # (PATH_FORK, LEFT),
         PATH_STRAIGHT,
         (PATH_ROUNDABOUT, 2),
         PATH_STRAIGHT,
@@ -150,6 +154,9 @@ def default_track_next_state():
             path_state_exit = track_states[default_track_counter][1]
     else:
         next_state = track_states[default_track_counter]
+
+    if state == next_state:  # trick code into thinking there's a state transition
+        prev_state = NULL
 
     default_track_counter += 1
     sleep_ms(200)
@@ -288,19 +295,15 @@ def main(initial_state=NULL):
 
         elif state == PATH_ROUNDABOUT:
             if is_transition or controller.target_met():
-                if path_state_phase == 0:
-                    controller.set_target(45, 45)
-                elif path_state_phase == 1:  # turn onto roundabout
-                    controller.set_target(-110, 110)
-                elif path_state_phase == 2:  # travel around roundabout
+                if path_state_phase == 0:  # turn onto roundabout
+                    controller.set_target(-100, 100)
+                elif path_state_phase == 1:  # travel around roundabout
                     if path_state_exit > 0:
                         controller.set_target(260, 40)  # perform a quarter turn
                         path_state_exit -= 1  # count off each quarter turn
                         path_state_phase -= 1  # stop state phase from incrementing until finished
-                elif path_state_phase == 3:  # turn off roundabout
-                    controller.set_target(-110, 110)
-                elif path_state_phase == 4:
-                    controller.set_target(45, 45)
+                elif path_state_phase == 2:  # turn off roundabout
+                    controller.set_target(-100, 100)
                 else:  # state transition
                     state = default_track_next_state()
                 # increment roundabout phase
