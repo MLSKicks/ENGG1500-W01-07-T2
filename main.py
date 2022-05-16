@@ -277,7 +277,7 @@ def main(initial_state=NULL):
         elif state == PATH_STRAIGHT:
             # set target for travel
             if is_transition:
-                controller.set_target(300, 300)
+                controller.set_target(300*sf, 300*sf)
             # state transition
             if controller.target_met():
                 state = default_track_next_state()
@@ -286,9 +286,9 @@ def main(initial_state=NULL):
             # set target for travel
             if is_transition:
                 if path_state_turn == LEFT:
-                    controller.set_target(300, 530)
+                    controller.set_target(300*sf, 530*sf)
                 else:
-                    controller.set_target(530, 300)
+                    controller.set_target(530*sf, 300*sf)
             # state transition
             if controller.target_met():
                 state = default_track_next_state()
@@ -299,7 +299,7 @@ def main(initial_state=NULL):
                     controller.set_target(-100, 100)
                 elif path_state_phase == 1:  # travel around roundabout
                     if path_state_exit > 0:
-                        controller.set_target(260, 40)  # perform a quarter turn
+                        controller.set_target(260*sf, 40*sf)  # perform a quarter turn
                         path_state_exit -= 1  # count off each quarter turn
                         path_state_phase -= 1  # stop state phase from incrementing until finished
                 elif path_state_phase == 2:  # turn off roundabout
@@ -312,7 +312,7 @@ def main(initial_state=NULL):
         elif state == PATH_DISTRACTING_LINE:
             # set target
             if is_transition:
-                controller.set_target(297, 297)
+                controller.set_target(300*sf, 300*sf)
             # state transition
             if controller.target_met():
                 state = default_track_next_state()
@@ -321,14 +321,14 @@ def main(initial_state=NULL):
             # set target
             if is_transition or controller.target_met():
                 if path_state_phase == 0:
-                    controller.set_target(35, 35)
+                    controller.set_target(35*sf, 35*sf)
                 elif path_state_phase == 1:
                     if path_state_turn == LEFT:
-                        controller.set_target(70, 290)
+                        controller.set_target(70*sf, 290*sf)
                     else:
-                        controller.set_target(290, 70)
+                        controller.set_target(290*sf, 70*sf)
                 elif path_state_phase == 2:
-                    controller.set_target(35, 35)
+                    controller.set_target(35*sf, 35*sf)
                 else:  # state transition
                     state = default_track_next_state()
                 path_state_phase += 1
@@ -336,13 +336,13 @@ def main(initial_state=NULL):
         elif state == PATH_CORNER:
             if is_transition or controller.target_met():
                 if path_state_phase == 0:  # travel forwards
-                    controller.set_target(148, 148)
+                    controller.set_target(148*sf, 148*sf)
                 elif path_state_phase == 1 and path_state_turn == LEFT:  # make a corner turn left
                     controller.set_target(-100, 100)
                 elif path_state_phase == 1 and path_state_turn == RIGHT:  # make a corner turn right
                     controller.set_target(100, -100)
                 elif path_state_phase == 2:  # travel forwards
-                    controller.set_target(148, 148)
+                    controller.set_target(148*sf, 148*sf)
                 else:  # state transition
                     state = default_track_next_state()
                 # increment corner phase
@@ -351,7 +351,7 @@ def main(initial_state=NULL):
         elif state == PATH_HALLWAY:
             # set target
             if is_transition:
-                controller.set_target(594, 594)
+                controller.set_target(594*sf, 594*sf)
             # state transition
             if controller.target_met():
                 state = default_track_next_state()
