@@ -64,8 +64,8 @@ class MotorController:
         self.stuck_count_left, self.stuck_count_right = 0, 0  # Count how long we have been stuck in place for
 
         # Various 'constants'
-        self.max_duty = 75  # This is the max duty we are allowed to produce
-        self.min_duty = -75  # This is the min duty we are allowed to produce
+        self.max_duty = 65  # This is the max duty we are allowed to produce
+        self.min_duty = -65  # This is the min duty we are allowed to produce
         self.bias = bias  # Corrects the imbalance in motor outputs
         self.amplitude = amplitude   # Amplitude of the output function
         self.base_duty = base_duty   # Base duty value of the output function

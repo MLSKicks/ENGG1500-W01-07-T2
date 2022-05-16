@@ -26,11 +26,15 @@ PATH_GENTLE_CURVE = 101
 PATH_ROUNDABOUT = 102
 PATH_DISTRACTING_LINE = 103
 PATH_FORK = 104
+PATH_BACK_FORK = 111
 PATH_CORNER = 105
 PATH_HALLWAY = 106
 PATH_CURVEY_ROAD = 107
 PATH_DEAD_END = 108
 PATH_SHARP_BEND = 109
+PATH_SMALL_STRAIGHT = 110
+PATH_REVERSE_DIRECTION = 112
+PATH_BIG_STRAIGHT = 113
 
 
 # - - - - - - - - - - - - - - - - - - - - - - - STATE VARIABLES - - - - - - - - - - - - - - - - - - - - - - - - #
@@ -84,10 +88,16 @@ def print_state(screen):
             screen.print("State: Line Foll\n-owing RIGHT")
         elif state == PATH_STRAIGHT:
             screen.print("State: Path Stra\n-ight")
+        elif state == PATH_SMALL_STRAIGHT:
+            screen.print("State: Path Smal\n-l Straight")
+        elif state == PATH_BACK_FORK:
+            screen.print("State: Back Fork")
+        elif state == PATH_REVERSE_DIRECTION:
+            screen.print("State: Reverse D\n-irection")
         elif state == PATH_GENTLE_CURVE:
             screen.print("State: Path Gent\n-le Curve")
         elif state == PATH_ROUNDABOUT:
-            screen.print("State: Path Roun\n-about")
+            screen.print("State: Path Roun\n-dabout")
         elif state == PATH_DISTRACTING_LINE:
             screen.print("State: Distracti\n-ng Lines")
         elif state == PATH_FORK:
@@ -102,6 +112,8 @@ def print_state(screen):
             screen.print("State: Dead End")
         elif state == PATH_SHARP_BEND:
             screen.print("State: Sharp Ben\n-d")
+        elif state == PATH_BIG_STRAIGHT:
+            screen.print("State: Big Strai\n-t")
         else:
             screen.print("State: Not Found")
 
@@ -120,35 +132,46 @@ def default_track_next_state():
     path_state_phase = 0
 
     track_states = [
-        (PATH_GENTLE_CURVE, LEFT),
-        PATH_STRAIGHT,
-        (PATH_ROUNDABOUT, 2),
-        PATH_STRAIGHT,
+        (PATH_BACK_FORK, RIGHT),
         (PATH_FORK, LEFT),
-        (PATH_GENTLE_CURVE, RIGHT),
-        (PATH_GENTLE_CURVE, RIGHT),
-        (PATH_FORK, LEFT),
-        PATH_DISTRACTING_LINE,
-        (PATH_ROUNDABOUT, 4),
-        PATH_DISTRACTING_LINE,
-        (PATH_FORK, RIGHT),
         (PATH_GENTLE_CURVE, LEFT),
-        (PATH_GENTLE_CURVE, LEFT),
+        PATH_BIG_STRAIGHT,
+        PATH_REVERSE_DIRECTION,
+        PATH_BIG_STRAIGHT,
+        (PATH_GENTLE_CURVE, RIGHT),
         (PATH_FORK, RIGHT),
+        (PATH_BACK_FORK, LEFT)
+        # (PATH_GENTLE_CURVE, LEFT),
+        # PATH_STRAIGHT,PATH_SMALL_STRAIGHT,
+        # (PATH_ROUNDABOUT, 2),
+        # PATH_STRAIGHT,
         # (PATH_FORK, LEFT),
-        # (PATH_DEAD_END, False),
+        # (PATH_GENTLE_CURVE, RIGHT),
+        # PATH_SMALL_STRAIGHT,
+        # (PATH_GENTLE_CURVE, RIGHT),
+        # (PATH_FORK, LEFT),
         # PATH_DISTRACTING_LINE,
-        # (PATH_CURVEY_ROAD, False),
-        # (PATH_FORK, LEFT),
-        PATH_STRAIGHT,
-        (PATH_ROUNDABOUT, 2),
-        PATH_STRAIGHT,
-        (PATH_GENTLE_CURVE, RIGHT)
+        # (PATH_ROUNDABOUT, 4),
+        # PATH_DISTRACTING_LINE,
+        # (PATH_FORK, RIGHT),
+        # (PATH_GENTLE_CURVE, LEFT),
+        # PATH_SMALL_STRAIGHT,
+        # (PATH_GENTLE_CURVE, LEFT),
+        # (PATH_FORK, RIGHT),
+        # # (PATH_FORK, LEFT),
+        # # (PATH_DEAD_END, False),
+        # # PATH_DISTRACTING_LINE,
+        # # (PATH_CURVEY_ROAD, False),
+        # # (PATH_FORK, LEFT),
+        # PATH_STRAIGHT,
+        # (PATH_ROUNDABOUT, 2),
+        # PATH_STRAIGHT,
+        # (PATH_GENTLE_CURVE, RIGHT)
     ]
 
     if type(track_states[default_track_counter]) is tuple:
         next_state = track_states[default_track_counter][0]
-        if next_state == PATH_GENTLE_CURVE or next_state == PATH_FORK:
+        if next_state == PATH_GENTLE_CURVE or next_state == PATH_FORK or next_state == PATH_BACK_FORK:
             path_state_turn = track_states[default_track_counter][1]
         elif next_state == PATH_ROUNDABOUT:
             path_state_exit = track_states[default_track_counter][1]
@@ -184,7 +207,7 @@ def main(initial_state=NULL):
     controller = vehicle.controller          # Get motor control object -> can set duties to achieve desired targets
     screen = vehicle.screen    # Get OLED screen object -> can print useful information
     state = initial_state      # Set the requested initial state
-    sf = 1                     # Scale Factor for road stretching
+    sf = 1.33333               # Scale Factor for road stretching
 
     while True:
         # - - - - - - - - - - - - - - - - - - - - SENSOR DATA COLLECTION - - - - - - - - - - - - - - - - - - #
@@ -282,13 +305,35 @@ def main(initial_state=NULL):
             if controller.target_met():
                 state = default_track_next_state()
 
+        elif state == PATH_BIG_STRAIGHT:
+            # set target for travel
+            if is_transition:
+                controller.set_target(2100, 2100)
+            # state transition
+            if controller.target_met():
+                state = default_track_next_state()
+
+        elif state == PATH_SMALL_STRAIGHT:
+            # set target for travel
+            if is_transition:
+                controller.set_target(100, 100)
+            # state transition
+            if controller.target_met():
+                state = default_track_next_state()
+
+        elif state == PATH_REVERSE_DIRECTION:
+            if is_transition:
+                controller.set_target(200, -200)
+            if controller.target_met():
+                state = default_track_next_state()
+
         elif state == PATH_GENTLE_CURVE:
             # set target for travel
             if is_transition:
                 if path_state_turn == LEFT:
-                    controller.set_target(300*sf, 530*sf)
+                    controller.set_target(300, 525)
                 else:
-                    controller.set_target(530*sf, 300*sf)
+                    controller.set_target(525, 300)
             # state transition
             if controller.target_met():
                 state = default_track_next_state()
@@ -299,7 +344,7 @@ def main(initial_state=NULL):
                     controller.set_target(-100, 100)
                 elif path_state_phase == 1:  # travel around roundabout
                     if path_state_exit > 0:
-                        controller.set_target(260*sf, 40*sf)  # perform a quarter turn
+                        controller.set_target(260, 40)  # perform a quarter turn
                         path_state_exit -= 1  # count off each quarter turn
                         path_state_phase -= 1  # stop state phase from incrementing until finished
                 elif path_state_phase == 2:  # turn off roundabout
@@ -317,18 +362,36 @@ def main(initial_state=NULL):
             if controller.target_met():
                 state = default_track_next_state()
 
+        elif state == PATH_BACK_FORK:
+            # set target
+            if is_transition or controller.target_met():
+                if path_state_phase == 0:
+                    controller.set_target(-40 * sf, -40 * sf)
+                elif path_state_phase == 1:
+                    if path_state_turn == LEFT:
+                        print("left")
+                        controller.set_target(-70, -290)
+                    else:
+                        print("right")
+                        controller.set_target(-290, -70)
+                elif path_state_phase == 2:
+                    controller.set_target(-40 * sf, -40 * sf)
+                else:  # state transition
+                    state = default_track_next_state()
+                path_state_phase += 1
+
         elif state == PATH_FORK:
             # set target
             if is_transition or controller.target_met():
                 if path_state_phase == 0:
-                    controller.set_target(35*sf, 35*sf)
+                    controller.set_target(40*sf, 40*sf)
                 elif path_state_phase == 1:
                     if path_state_turn == LEFT:
-                        controller.set_target(70*sf, 290*sf)
+                        controller.set_target(70, 295)
                     else:
-                        controller.set_target(290*sf, 70*sf)
+                        controller.set_target(295, 70)
                 elif path_state_phase == 2:
-                    controller.set_target(35*sf, 35*sf)
+                    controller.set_target(40*sf, 40*sf)
                 else:  # state transition
                     state = default_track_next_state()
                 path_state_phase += 1
