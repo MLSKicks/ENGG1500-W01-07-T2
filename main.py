@@ -152,7 +152,7 @@ def default_track_next_state():
         next_state = track_states[default_track_counter]
 
     default_track_counter += 1
-    sleep_ms(250)
+    sleep_ms(200)
     return next_state
 
 
@@ -192,7 +192,7 @@ def main(initial_state=NULL):
         us_r = vehicle.us_r.proximity()
 
         # - - - - - - - - - - - - - - - - - - - - GLOBAL TRANSITIONS - - - - - - - - - - - - - - - - - - - - #
-        if rgb_prox < 35:         # Something is on the road or obstructing the sensor -> so lets stop
+        if rgb_prox < 40:         # Something is on the road or obstructing the sensor -> so lets stop
             state = HAZARD
 
         # - - - - - - - - - - - - - - - - - - - - STATE MACHINE HEADER - - - - - - - - - - - - - - - - - - - #
@@ -243,7 +243,11 @@ def main(initial_state=NULL):
         # Stop if we encounter a hazard on the road
         elif state == HAZARD:  # TODO: How do we react to a hazard? Stop? Go Around?
             if is_transition:
-                controller.set_target(0, 0)
+                controller.set_target(-125, -125)
+            if controller.target_met():
+                path_state_phase = 0
+                path_state_exit = 2
+                state = PATH_ROUNDABOUT
 
         # - LF_FWD -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
         # Line-Follow-Forward attempts to follow straight or slightly bendy lines
@@ -266,7 +270,7 @@ def main(initial_state=NULL):
         elif state == PATH_STRAIGHT:
             # set target for travel
             if is_transition:
-                controller.set_target(297*sf, 297*sf)
+                controller.set_target(300, 300)
             # state transition
             if controller.target_met():
                 state = default_track_next_state()
@@ -275,24 +279,28 @@ def main(initial_state=NULL):
             # set target for travel
             if is_transition:
                 if path_state_turn == LEFT:
-                    controller.set_target(309, 525)
+                    controller.set_target(300, 530)
                 else:
-                    controller.set_target(525, 309)
+                    controller.set_target(530, 300)
             # state transition
             if controller.target_met():
                 state = default_track_next_state()
 
         elif state == PATH_ROUNDABOUT:
             if is_transition or controller.target_met():
-                if path_state_phase == 0:  # turn onto roundabout
+                if path_state_phase == 0:
+                    controller.set_target(45, 45)
+                elif path_state_phase == 1:  # turn onto roundabout
                     controller.set_target(-110, 110)
-                elif path_state_phase == 1:  # travel around roundabout
+                elif path_state_phase == 2:  # travel around roundabout
                     if path_state_exit > 0:
                         controller.set_target(260, 40)  # perform a quarter turn
                         path_state_exit -= 1  # count off each quarter turn
                         path_state_phase -= 1  # stop state phase from incrementing until finished
-                elif path_state_phase == 2:  # turn off roundabout
+                elif path_state_phase == 3:  # turn off roundabout
                     controller.set_target(-110, 110)
+                elif path_state_phase == 4:
+                    controller.set_target(45, 45)
                 else:  # state transition
                     state = default_track_next_state()
                 # increment roundabout phase
@@ -308,14 +316,19 @@ def main(initial_state=NULL):
 
         elif state == PATH_FORK:
             # set target
-            if is_transition:
-                if path_state_turn == LEFT:
-                    controller.set_target(70, 290)
-                else:
-                    controller.set_target(290, 70)
-            # state transition
-            if controller.target_met():
-                state = default_track_next_state()
+            if is_transition or controller.target_met():
+                if path_state_phase == 0:
+                    controller.set_target(35, 35)
+                elif path_state_phase == 1:
+                    if path_state_turn == LEFT:
+                        controller.set_target(70, 290)
+                    else:
+                        controller.set_target(290, 70)
+                elif path_state_phase == 2:
+                    controller.set_target(35, 35)
+                else:  # state transition
+                    state = default_track_next_state()
+                path_state_phase += 1
 
         elif state == PATH_CORNER:
             if is_transition or controller.target_met():
@@ -363,194 +376,6 @@ def test_controller(target_mm_l, target_mm_r, amplitude, offset, base_duty, bias
         vehicle.set_motor(*vehicle.controller.run())
         sleep_ms(sleep)
     vehicle.set_motor(0, 0)
-
-
-def run(vehicle, left_target, right_target):
-    """Complete a target using motor_control"""
-    # Set our target
-    vehicle.controller.set_target(left_target, right_target)
-
-    # Loop until we are done!
-    while not vehicle.controller.target_met():
-        vehicle.set_motor(*vehicle.controller.run())
-
-    # Done, so stop motors
-    vehicle.set_motor(0, 0)
-
-
-def run2(vehicle, left_target, right_target, divisions):
-    # Divide the targets into n steps or segments
-    left_target_step = left_target / divisions
-    right_target_step = right_target / divisions
-
-    # Set our initial target
-    vehicle.controller.set_target(left_target_step, right_target_step)
-
-    # Once each step is done, add the next step. Loop until we are done!
-    for i in range(0, divisions, 1):
-        while not vehicle.controller.target_met():
-            vehicle.set_motor(*vehicle.controller.run())
-
-        # vehicle.pid.add_target(left_target_step, right_target_step)
-        vehicle.controller.set_target(left_target_step, right_target_step)
-
-    # Done, so stop motors
-    vehicle.set_motor(0, 0)
-
-
-def gentle_curve(vehicle, turn_left=True):
-    """Travel around the gentle curve track piece, in either the left or right direction"""
-    global sf
-    vehicle.screen.print("State*: Gentle C-urve")
-    if turn_left:  # Do the turn
-        run2(vehicle, 309, 525, 2)
-    else:
-        run2(vehicle, 525, 309, 2)
-
-
-def roundabout(vehicle, exit_):
-    """Take an any exit on the roundabout track piece! We must first ensure 1 <= exit_ <= 4, then:
-            1 -> turn left
-            2 -> travel forward
-            3 -> turn right
-            4 -> U-turn """
-    vehicle.screen.print("State*: Round Ab-out")
-    exit_ = (exit_ % 4)  # Ensure that exit_ is a valid exit
-    if exit_ == 0:
-        exit_ = 4
-
-    # run(vehicle, 45, 45)           # Lead in
-    run(vehicle, -110, 110)        # Turn onto the roundabout
-    sleep_ms(200)
-    for i in range(0, exit_, 1):   # Complete a quarter turn exit_ times
-        run(vehicle, 260, 40)
-        sleep_ms(200)
-    run(vehicle, -110, 110)        # Travel out of the roundabout
-    # run(vehicle, 45, 45)           # Lead out
-
-
-def distracting_line(vehicle):
-    """Complete the distracting line track piece"""
-    vehicle.screen.print("State*: Distract-ing Lines")
-    run(vehicle, 297, 297)
-
-
-def fork(vehicle, turn_left=True):
-    """Complete the fork, turning left if turn_left=True or right if turn_left=False"""
-    vehicle.screen.print("State*: Fork")
-    run(vehicle, 35, 35)  # Lead in
-    if turn_left:
-        run2(vehicle, 70, 290, 2)
-    else:
-        run2(vehicle, 290, 70, 2)
-    run(vehicle, 35, 35)  # Lead out
-
-
-def corner(vehicle, turn_left=True):
-    """Complete the corner, turning left if turn_left=True or right if turn_left=False"""
-    vehicle.screen.print("State*: Corner")
-    run(vehicle, 148, 148)
-    if turn_left:
-        run(vehicle, -100, 100)  # Rotate 90 degrees left
-    else:
-        run(vehicle, 100, -100)  # Rotate 90 degrees right
-    run(vehicle, 148, 148)
-
-
-def straight(vehicle):
-    vehicle.screen.print("State*: Straight")
-    """Complete the straight track piece"""
-    run(vehicle, 297, 297)
-    # run(vehicle, 367, 367)
-
-
-def hallway(vehicle):
-    """Complete the converging or parallel hallway"""
-    vehicle.screen.print("State*: Hallway")
-    run(vehicle, 594, 594)
-
-
-def curve_road(vehicle, reverse_direction=False):
-    """Complete the special bendy piece"""
-    vehicle.screen.print("State*: Curvey")
-    if reverse_direction:
-        run(vehicle, 297, 52)  # Travel in a big circle clockwise 100 degrees
-        run(vehicle, 39, 479)  # Travel in a big circle anti-clockwise 180 degrees
-        run(vehicle, 180, 180)  # Go straight for a bit
-        run(vehicle, 55, -55)  # Rotate -45 degrees
-    else:
-        run(vehicle, -55, 55)  # Rotate 45 degrees
-        run(vehicle, 180, 180)  # Go straight for a bit
-        run(vehicle, 479, 39)   # Travel in a big circle clockwise 180 degrees
-        run(vehicle, 52, 297)   # Travel in a big circle anti-clockwise 100 degrees
-
-
-def dead_end(vehicle, facing_dead_end=True):
-    """Complete the dead end piece"""
-    vehicle.screen.print("State*: Dead End")
-    # TODO dead_end
-    if facing_dead_end:
-        pass
-    else:
-        pass
-
-
-def sharp_bend(vehicle, reverse_direction=False):
-    """Complete the sharp bend piece"""
-    vehicle.screen.print("State*: Sharp Be-nd")
-    # TODO sharp_bend
-    if reverse_direction:
-        pass
-    else:
-        pass
-
-
-def complete_basic_track():
-    """Complete the basic track, let's get at least a pass!"""
-    vehicle = Vehicle(motor=True, enc=True, screen=True)
-
-    # Get to 2 roundabouts
-    gentle_curve(vehicle, turn_left=True)
-    sleep_ms(200)
-    straight(vehicle)
-    sleep_ms(200)
-    roundabout(vehicle, 2)
-    sleep_ms(200)
-    straight(vehicle)
-    sleep_ms(200)
-    fork(vehicle, turn_left=True)
-    sleep_ms(200)
-    gentle_curve(vehicle, turn_left=False)
-    sleep_ms(200)
-    gentle_curve(vehicle, turn_left=False)
-    sleep_ms(200)
-    fork(vehicle, turn_left=True)
-    sleep_ms(200)
-    distracting_line(vehicle)
-    sleep_ms(200)
-    roundabout(vehicle, 4)
-
-    # Get back home
-    distracting_line(vehicle)
-    sleep_ms(200)
-    fork(vehicle, turn_left=True)
-    sleep_ms(200)
-    dead_end(vehicle, facing_dead_end=False)
-    sleep_ms(200)
-    distracting_line(vehicle)
-    sleep_ms(200)
-    curve_road(vehicle, reverse_direction=False)
-    sleep_ms(200)
-    fork(vehicle, turn_left=True)
-    sleep_ms(200)
-    straight(vehicle)
-    sleep_ms(200)
-    roundabout(vehicle, 2)
-    sleep_ms(200)
-    straight(vehicle)
-    sleep_ms(200)
-    gentle_curve(vehicle, turn_left=False)
-    sleep_ms(200)
 
 
 if __name__ == "__main__":
