@@ -203,7 +203,7 @@ def main(initial_state=NULL):
         path_state_exit, path_state_phase
 
     # - - - - - - - - - - - - - - - - - - - - - - - INITIALISATION - - - - - - - - - - - - - - - - - - - - - - - #
-    vehicle = Vehicle(motor=True, enc=True, screen=True, rgb=True, ir_l=True, ir_r=True, us_l=True, us_r=True)
+    vehicle = Vehicle(motor=True, enc=True, screen=True, ir_f=False, ir_b=False)
     controller = vehicle.controller          # Get motor control object -> can set duties to achieve desired targets
     screen = vehicle.screen    # Get OLED screen object -> can print useful information
     state = initial_state      # Set the requested initial state
@@ -211,18 +211,11 @@ def main(initial_state=NULL):
 
     while True:
         # - - - - - - - - - - - - - - - - - - - - SENSOR DATA COLLECTION - - - - - - - - - - - - - - - - - - #
-        ir_l_onroad = vehicle.ir_l.is_on_road()
-        ir_r_onroad = vehicle.ir_r.is_on_road()
-        rgb_onroad = vehicle.rgb.is_on_road()  # rgb_onroad is more vague than rgb_directly_onroad
-        rgb_directly_onroad = vehicle.rgb.is_on_road_by_prox()  # more like an IR sensor reading
-        ambient = vehicle.rgb.ambient()
-        rgb_hue = vehicle.rgb.hue()
-        rgb_prox = vehicle.rgb.proximity_mm()
-        us_l = vehicle.us_l.proximity()
-        us_r = vehicle.us_r.proximity()
+        hazard_forwards = False
+        hazard_backwards = False
 
         # - - - - - - - - - - - - - - - - - - - - GLOBAL TRANSITIONS - - - - - - - - - - - - - - - - - - - - #
-        if rgb_prox < 40:         # Something is on the road or obstructing the sensor -> so lets stop
+        if hazard_forwards or hazard_backwards:  # Something is in front so lets stop
             state = HAZARD
 
         # - - - - - - - - - - - - - - - - - - - - STATE MACHINE HEADER - - - - - - - - - - - - - - - - - - - #
@@ -244,15 +237,6 @@ def main(initial_state=NULL):
         elif state == PRINT_ROAD_INFO:
             if is_transition:
                 controller.set_target(0, 0)
-
-            screen.print_variable("IR-L Road{!s:>7}\n"
-                                  "IR-R Road{!s:>7}\n"
-                                  "RGB Road{!s:>8}\n"
-                                  "RGB Amb{:9d}\n"
-                                  "RGB Hue{:9d}\n"
-                                  "RGB Prox{:8d}".format(ir_l_onroad, ir_r_onroad, rgb_directly_onroad,
-                                                         ambient, rgb_hue, rgb_prox),
-                                  0, 2)
 
             if elapsed_ms() > 1000:
                 state = default_track_next_state()
