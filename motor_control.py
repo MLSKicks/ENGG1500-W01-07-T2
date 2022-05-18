@@ -35,7 +35,7 @@ class MotorController:
         2. Wheel diameter is 65 mm -> 40 clicks = pi*65 mm
         3. The output function"""
     # a = 25, of = 1.2, base = 28, bias = 5
-    def __init__(self, encoder, target_mm_left=0, target_mm_right=0, amplitude=50, offset=1.2, base_duty=30, bias=3):
+    def __init__(self, encoder, target_mm_left=0, target_mm_right=0, amplitude=45, offset=1.2, base_duty=30, bias=3):
         """Initialise all controller constants, variables, and encoder object."""
         # Initialise encoder
         self.encoder = encoder      # Save the encoder object
@@ -70,6 +70,10 @@ class MotorController:
         self.amplitude = amplitude   # Amplitude of the output function
         self.base_duty = base_duty   # Base duty value of the output function
         self.offset_amount = offset  # Offset for the output function
+
+    def set_max_duty(self, max_duty):
+        self.max_duty = abs(max_duty)
+        self.min_duty = -abs(max_duty)
 
     def run(self):
         """Calculates the pwm values using a closed feedback loop"""
@@ -138,8 +142,8 @@ class MotorController:
 
         # Calculate the 'offset' of our bell curve. This allows us to concentrate higher speeds at the start
         # of our trip, such that we have sufficient time to slow down and stop at the target (countering overshooting)
-        r_offset = max(r_target, l_target) / self.offset_amount
-        l_offset = max(l_target, r_target) / self.offset_amount
+        r_offset = r_target / self.offset_amount
+        l_offset = l_target / self.offset_amount
 
         # Finally, calculate the actual duty!
         self.duty_left = l_polarity * (l_amplitude * exp(-l_width * ((l_polarity * self.error_left - l_offset) ** 2))
@@ -180,35 +184,35 @@ class MotorController:
         lduty = self.duty_left
         rduty = self.duty_right
 
-        # Find percentage completion of both sides
-        if self.target_mm_left == 0:
-            completion_left = 0
-        else:
-            completion_left = abs(self.mm_left / self.target_mm_left)
-
-        if self.target_mm_right == 0:
-            completion_right = 0
-        else:
-            completion_right = abs(self.mm_right / self.target_mm_right)
-
-        difference = completion_left - completion_right
-
-        # Get polarity
-        l_polarity, r_polarity = 1, 1
-        if lduty < 0:
-            l_polarity = -1
-        if rduty < 0:
-            r_polarity = -1
-
-        # If difference is out by too much, correct
-        if difference > 0.03:
-            print("Adding bonus to right side")
-            rduty += l_polarity * difference * 30
-            lduty += -l_polarity * difference * 30
-        elif difference < -0.03:
-            print("Adding bonus to left side")
-            lduty += r_polarity * -difference * 30
-            rduty += -r_polarity * -difference * 30
+        # # Find percentage completion of both sides
+        # if self.target_mm_left == 0:
+        #     completion_left = 0
+        # else:
+        #     completion_left = abs(self.mm_left / self.target_mm_left)
+        #
+        # if self.target_mm_right == 0:
+        #     completion_right = 0
+        # else:
+        #     completion_right = abs(self.mm_right / self.target_mm_right)
+        #
+        # difference = completion_left - completion_right
+        #
+        # # Get polarity
+        # l_polarity, r_polarity = 1, 1
+        # if lduty < 0:
+        #     l_polarity = -1
+        # if rduty < 0:
+        #     r_polarity = -1
+        #
+        # # If difference is out by too much, correct
+        # if difference > 0.03:
+        #     print("Adding bonus to right side")
+        #     rduty += l_polarity * difference * 30
+        #     lduty += -l_polarity * difference * 30
+        # elif difference < -0.03:
+        #     print("Adding bonus to left side")
+        #     lduty += r_polarity * -difference * 30
+        #     rduty += -r_polarity * -difference * 30
 
         return int(lduty + self.bias), int(rduty - self.bias)
 
