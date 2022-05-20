@@ -35,7 +35,7 @@ class MotorController:
         2. Wheel diameter is 65 mm -> 40 clicks = pi*65 mm
         3. The output function"""
     # a = 25, of = 1.2, base = 28, bias = 5
-    def __init__(self, encoder, target_mm_left=0, target_mm_right=0, amplitude=45, offset=1.2, base_duty=30, bias=3):
+    def __init__(self, encoder, target_mm_left=0, target_mm_right=0, amplitude=45, offset=1.2, base_duty=30, bias=0):
         """Initialise all controller constants, variables, and encoder object."""
         # Initialise encoder
         self.encoder = encoder      # Save the encoder object
@@ -88,7 +88,7 @@ class MotorController:
 
     def set_target(self, target_mm_left, target_mm_right):
         """Reset controller with a new target"""
-        self.__init__(self.encoder, target_mm_left+self.error_left, target_mm_right+self.error_right)
+        self.__init__(self.encoder, target_mm_left, target_mm_right)
 
     def add_target(self, target_mm_left, target_mm_right):
         """Reset with a new target, but holding onto the old error"""
@@ -184,13 +184,22 @@ class MotorController:
         lduty = self.duty_left
         rduty = self.duty_right
 
+        lpolarity = 1
+        rpolarity = 1
+        if lduty < 0:
+            lpolarity = -1
+        if rduty < 0:
+            rpolarity = -1
+
         sideways_error = 0
         if abs(self.target_mm_left) == abs(self.target_mm_right):
-            sideways_error = 1*(abs(self.error_left) - abs(self.error_right))
+            sideways_error = 50*(abs(self.error_left) - abs(self.error_right))
+            sideways_error = clamp(sideways_error, 25, -25)  # clamp to |25|
             # if our error is smaller on the right compared to the left, we want to increase
             # the left motor
-
-        return int(lduty + self.bias + sideways_error), int(rduty - self.bias - sideways_error)
+        print("sideways_error=", sideways_error)
+        return int(lduty + lpolarity*self.bias + lpolarity*sideways_error), \
+            int(rduty - rpolarity*self.bias - rpolarity*sideways_error)
 
     def update_elapsed_time(self):
         """Calculates the elapsed time, dt, since the last call. Also resets self.t0"""

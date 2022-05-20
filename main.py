@@ -22,27 +22,29 @@ BACKWARDS = 101
 ROTATE_LEFT = 102
 ROTATE_RIGHT = 103
 CUSTOM = 104
+PARKING = 105
+UNPARKING = 106
 
 default_track_states = [
     # reverse out
-    (CUSTOM, -450, -450, 55),  # backwards
-    (CUSTOM, 110, -110, 65),   # rotate right
+    (UNPARKING, -550, -550, 45),  # backwards
+    (ROTATE_RIGHT, 100, -100, 50),   # rotate right
 
     # get to first roundabout
-    (CUSTOM, 600, 600, 55),   # forwards
+    (FORWARDS, 750, 750, 45),   # forwards
     SPLASH_SCREEN, SPLASH_SCREEN,
 
     # get to second roundabout
-    (CUSTOM, 1500, 1500, 45),  # forwards
+    (FORWARDS, 1650, 1650, 45),  # forwards
     SPLASH_SCREEN, SPLASH_SCREEN,
 
     # return home
-    (CUSTOM, 220, -220, 55),   # rotate right
-    (CUSTOM, 2100, 2100, 45),  # forwards
+    (ROTATE_RIGHT, 200, -200, 50),   # rotate right
+    (FORWARDS, 2430, 2430, 45),  # forwards
 
     # reverse in
-    (CUSTOM, 110, -110, 65),   # rotate right
-    (CUSTOM, -450, -450, 55),  # backwards
+    (ROTATE_LEFT, -100, 100, 50),   # rotate right
+    (PARKING, -550, -550, 45),  # backwards
     STOP
 ]
 
@@ -117,6 +119,10 @@ class StateMachine:
                 self.screen.print("State: Rotate\nRight")
             elif self.state == CUSTOM:
                 self.screen.print("State: Custom")
+            elif self.state == PARKING:
+                self.screen.print("State: parkin\n-g")
+            elif self.state == UNPARKING:
+                self.screen.print("State: unpark\n-ing")
             else:
                 self.screen.print("State: Not Found")
 
@@ -128,14 +134,13 @@ class StateMachine:
         next_state = default_track_states[self.default_track_counter]
 
         if type(next_state) is tuple:
-            if next_state[0] == CUSTOM:
-                self.custom_target_left = next_state[1]
-                self.custom_target_right = next_state[2]
-                self.max_speed = next_state[3]
+            self.custom_target_left = next_state[1]
+            self.custom_target_right = next_state[2]
+            self.max_speed = next_state[3]
             next_state = next_state[0]
 
         self.default_track_counter += 1
-        sleep_ms(200)
+        sleep_ms(1000)
         return next_state
 
     # - - - - - - - - - - - - - - - - - - - - - - MAIN STATE MACHINE - - - - - - - - - - - - - - - - - - - - - - - #
@@ -204,7 +209,7 @@ class StateMachine:
             elif self.state == FORWARDS:
                 # set target for travel
                 if self.is_transition:
-                    self.controller.set_target(300, 300)
+                    self.controller.set_target(self.custom_target_left, self.custom_target_right)
                 # state transition
                 if self.controller.target_met():
                     self.update_state(self.default_track_next_state())
@@ -213,7 +218,7 @@ class StateMachine:
             elif self.state == BACKWARDS:
                 # set target for travel
                 if self.is_transition:
-                    self.controller.set_target(-300, -300)
+                    self.controller.set_target(self.custom_target_left, self.custom_target_right)
                 # state transition
                 if self.controller.target_met():
                     self.update_state(self.default_track_next_state())
@@ -222,8 +227,7 @@ class StateMachine:
             elif self.state == ROTATE_RIGHT:
                 # set target for travel
                 if self.is_transition:
-                    print("run")
-                    self.controller.set_target(110, -110)
+                    self.controller.set_target(self.custom_target_left, self.custom_target_right)
                 # state transition
                 if self.controller.target_met():
                     self.update_state(self.default_track_next_state())
@@ -232,11 +236,28 @@ class StateMachine:
             elif self.state == ROTATE_LEFT:
                 # set target for travel
                 if self.is_transition:
-                    self.controller.set_target(-110, 110)
+                    self.controller.set_target(self.custom_target_left, self.custom_target_right)
                 # state transition
                 if self.controller.target_met():
                     self.update_state(self.default_track_next_state())
 
+            # - PARKING -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
+            elif self.state == PARKING:
+                # set target for travel
+                if self.is_transition:
+                    self.controller.set_target(self.custom_target_left, self.custom_target_right)
+                # state transition
+                if self.controller.target_met():
+                    self.update_state(self.default_track_next_state())
+
+            # - UNPARKING -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
+            elif self.state == UNPARKING:
+                # set target for travel
+                if self.is_transition:
+                    self.controller.set_target(self.custom_target_left, self.custom_target_right)
+                # state transition
+                if self.controller.target_met():
+                    self.update_state(self.default_track_next_state())
             # - CUSTOM -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
             elif self.state == CUSTOM:
                 # set target for travel
