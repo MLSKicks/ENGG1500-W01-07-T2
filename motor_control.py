@@ -184,37 +184,13 @@ class MotorController:
         lduty = self.duty_left
         rduty = self.duty_right
 
-        # # Find percentage completion of both sides
-        # if self.target_mm_left == 0:
-        #     completion_left = 0
-        # else:
-        #     completion_left = abs(self.mm_left / self.target_mm_left)
-        #
-        # if self.target_mm_right == 0:
-        #     completion_right = 0
-        # else:
-        #     completion_right = abs(self.mm_right / self.target_mm_right)
-        #
-        # difference = completion_left - completion_right
-        #
-        # # Get polarity
-        # l_polarity, r_polarity = 1, 1
-        # if lduty < 0:
-        #     l_polarity = -1
-        # if rduty < 0:
-        #     r_polarity = -1
-        #
-        # # If difference is out by too much, correct
-        # if difference > 0.03:
-        #     print("Adding bonus to right side")
-        #     rduty += l_polarity * difference * 30
-        #     lduty += -l_polarity * difference * 30
-        # elif difference < -0.03:
-        #     print("Adding bonus to left side")
-        #     lduty += r_polarity * -difference * 30
-        #     rduty += -r_polarity * -difference * 30
+        sideways_error = 0
+        if abs(self.target_mm_left) == abs(self.target_mm_right):
+            sideways_error = 1*(abs(self.error_left) - abs(self.error_right))
+            # if our error is smaller on the right compared to the left, we want to increase
+            # the left motor
 
-        return int(lduty + self.bias), int(rduty - self.bias)
+        return int(lduty + self.bias + sideways_error), int(rduty - self.bias - sideways_error)
 
     def update_elapsed_time(self):
         """Calculates the elapsed time, dt, since the last call. Also resets self.t0"""

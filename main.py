@@ -187,7 +187,7 @@ class StateMachine:
 
             # - STOP -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
             # Stop once we have finished our task
-            elif self.state == STOP:  # TODO: How does user ask vehicle to go again after finishing track?
+            elif self.state == STOP:
                 if self.is_transition:
                     self.controller.set_target(0, 0)
 
@@ -256,6 +256,17 @@ def test_controller(target_mm_l, target_mm_r, amplitude, offset, base_duty, bias
     """Test different proportionality constants for controller"""
     vehicle = Vehicle(screen=True, enc=True, motor=True)
     vehicle.controller.reset(target_mm_l, target_mm_r, amplitude, offset, base_duty, bias)
+    while not vehicle.controller.target_met():
+        vehicle.set_motor(*vehicle.controller.run())
+        sleep_ms(sleep)
+    vehicle.set_motor(0, 0)
+
+
+def test2_controller(target_mm_l, target_mm_r, max_duty, bias=3, loops=30, sleep=50):
+    """Test different proportionality constants for controller"""
+    vehicle = Vehicle(screen=True, enc=True, motor=True)
+    vehicle.controller.set_target(target_mm_l, target_mm_r)
+    vehicle.controller.set_max_duty(max_duty)
     while not vehicle.controller.target_met():
         vehicle.set_motor(*vehicle.controller.run())
         sleep_ms(sleep)
