@@ -55,6 +55,7 @@ track_states = [
     STOP
 ]
 
+
 # - - - - - - - - - - - - - - - - - - - - - STATE MACHINE - - - - - - - - - - - - - - - - - - - - - - - #
 class StateMachine:
     def __init__(self, initial_state):
@@ -69,7 +70,8 @@ class StateMachine:
         self.custom_target_left, self.custom_target_right = 0, 0
         self.max_speed = 65
         self.HAZARD_TIMEOUT = 5000  # ms
-        self.DEPLOY_SENSOR_TIMEOUT = 1000 # ms
+        self.DEPLOY_SENSOR_TIMEOUT = 1000  # ms
+        self.SPLASH_SCREEN_TIMEOUT = 1000  # ms
 
         # Other initialisation
         self.vehicle = Vehicle(motor=True, enc=True, screen=True, ir_f=True, ir_b=False)
@@ -193,7 +195,7 @@ class StateMachine:
                 if self.is_transition:
                     self.controller.set_target(0, 0)
 
-                if self.elapsed_ms() > 1000:
+                if self.elapsed_ms() > self.SPLASH_SCREEN_TIMEOUT:
                     self.update_state(self.track_next_state())
 
             # - DEPLOY_SENSOR -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
@@ -218,7 +220,7 @@ class StateMachine:
 
                 self.screen.print_variable("IR_F Hazard{!s:>5}".format(hazard_forwards), 0, 2)
 
-                if self.elapsed_ms() > 100:
+                if self.elapsed_ms() > 1000:
                     pass
 
             # - STOP -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
