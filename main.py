@@ -24,36 +24,35 @@ ROTATE_RIGHT = 103
 CUSTOM = 104
 PARKING = 105
 UNPARKING = 106
+DEPLOY_SENSOR = 107
 
-default_track_states = [
+# ! ! ! ! ! ! ! ! ! EDIT HERE ! ! ! ! ! ! ! ! ! ! #
+
+v_sf = 1  # vertical scale factor
+h_sf = 1  # horizontal scale factor
+
+track_states = [
     # reverse out
-    (UNPARKING, -550, -550, 45),  # backwards
+    (UNPARKING, -550*h_sf, -550*h_sf, 45),  # backwards
     (ROTATE_RIGHT, 100, -100, 50),   # rotate right
 
     # get to first roundabout
-    (FORWARDS, 750, 750, 45),   # forwards
-    SPLASH_SCREEN, SPLASH_SCREEN,
+    (FORWARDS, 750*v_sf, 750*v_sf, 45),   # forwards
+    DEPLOY_SENSOR,
 
     # get to second roundabout
-    (FORWARDS, 1650, 1650, 45),  # forwards
-    SPLASH_SCREEN, SPLASH_SCREEN,
+    (FORWARDS, 1650*v_sf, 1650*v_sf, 45),  # forwards
+    DEPLOY_SENSOR,
 
     # return home
     (ROTATE_RIGHT, 200, -200, 50),   # rotate right
-    (FORWARDS, 2430, 2430, 45),  # forwards
+    (FORWARDS, 2430*v_sf, 2430*v_sf, 45),  # forwards
 
     # reverse in
     (ROTATE_LEFT, -100, 100, 50),   # rotate right
-    (PARKING, -550, -550, 45),  # backwards
+    (PARKING, -550*h_sf, -550*h_sf, 45),  # backwards
     STOP
 ]
-
-# default_track_states = [
-#     ROTATE_RIGHT,
-#     ROTATE_LEFT,
-#     STOP
-# ]
-
 
 # - - - - - - - - - - - - - - - - - - - - - STATE MACHINE - - - - - - - - - - - - - - - - - - - - - - - #
 class StateMachine:
@@ -65,12 +64,12 @@ class StateMachine:
         self.t0 = ticks_ms()  # For calculating time spent in a state
 
         # Special state variables for the path state
-        self.default_track_counter = 0
+        self.track_counter = 0
         self.custom_target_left, self.custom_target_right = 0, 0
         self.max_speed = 65
 
         # Other initialisation
-        self.vehicle = Vehicle(motor=True, enc=True, screen=True, ir_f=False, ir_b=False)
+        self.vehicle = Vehicle(motor=True, enc=True, screen=True, ir_f=True, ir_b=False)
         self.controller = self.vehicle.controller  # motor control object can set duties to achieve desired targets
         self.screen = self.vehicle.screen  # Get OLED screen object -> can print useful information
 
@@ -103,6 +102,8 @@ class StateMachine:
                 self.screen.print("State: NULL\n\nNo initial state\nwas specified!")
             elif self.state == SPLASH_SCREEN:
                 self.screen.print_art(ascii_cat)
+            elif self.state == DEPLOY_SENSOR:
+                self.screen.print("State: Deploying\nCordel Sensors")
             elif self.state == PRINT_ROAD_INFO:
                 self.screen.print("State: Road Info")
             elif self.state == STOP:
@@ -110,9 +111,9 @@ class StateMachine:
             elif self.state == HAZARD:
                 self.screen.print("State: Hazard\n\nSomething got in\n my way!")
             elif self.state == FORWARDS:
-                self.screen.print("State: Travel\n-ling Forwards")
+                self.screen.print("State: Travell-\ning Forwards")
             elif self.state == BACKWARDS:
-                self.screen.print("State: Travel\n-ling Backwards")
+                self.screen.print("State: Travell-\ning Backwards")
             elif self.state == ROTATE_LEFT:
                 self.screen.print("State: Rotate\nLeft")
             elif self.state == ROTATE_RIGHT:
@@ -120,9 +121,9 @@ class StateMachine:
             elif self.state == CUSTOM:
                 self.screen.print("State: Custom")
             elif self.state == PARKING:
-                self.screen.print("State: parkin\n-g")
+                self.screen.print("State: parking")
             elif self.state == UNPARKING:
-                self.screen.print("State: unpark\n-ing")
+                self.screen.print("State: unparking")
             else:
                 self.screen.print("State: Not Found")
 
@@ -130,8 +131,8 @@ class StateMachine:
         """Calculates the elapsed ms in the current state, relies on update_state_variables()"""
         return ticks_diff(ticks_ms(), self.t0)
 
-    def default_track_next_state(self):
-        next_state = default_track_states[self.default_track_counter]
+    def track_next_state(self):
+        next_state = track_states[self.track_counter]
 
         if type(next_state) is tuple:
             self.custom_target_left = next_state[1]
@@ -139,7 +140,7 @@ class StateMachine:
             self.max_speed = next_state[3]
             next_state = next_state[0]
 
-        self.default_track_counter += 1
+        self.track_counter += 1
         sleep_ms(1000)
         return next_state
 
@@ -160,7 +161,7 @@ class StateMachine:
 
         while True:
             # - - - - - - - - - - - - - - - - - - - - SENSOR DATA COLLECTION - - - - - - - - - - - - - - - - - - #
-            hazard_forwards = False
+            hazard_forwards = self.vehicle.ir_f.is_hazard()
             hazard_backwards = False
 
             # - - - - - - - - - - - - - - - - - - - - GLOBAL TRANSITIONS - - - - - - - - - - - - - - - - - - - - #
@@ -179,7 +180,15 @@ class StateMachine:
                     self.controller.set_target(0, 0)
 
                 if self.elapsed_ms() > 1000:
-                    self.update_state(PRINT_ROAD_INFO)
+                    self.update_state(self.track_next_state())
+
+            # - DEPLOY_SENSOR -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
+            if self.state == DEPLOY_SENSOR:
+                if self.is_transition:
+                    self.controller.set_target(0, 0)
+
+                if self.elapsed_ms() > 1000:
+                    self.update_state(self.track_next_state())
 
             # - PRINT_ROAD_INFO -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
             # Displays what our IR sensors are saying
@@ -187,8 +196,10 @@ class StateMachine:
                 if self.is_transition:
                     self.controller.set_target(0, 0)
 
+                self.screen.print_variable("IR_F Hazard{!s:>5}".format(hazard_forwards), 0, 2)
+
                 if self.elapsed_ms() > 100:
-                    self.update_state(self.default_track_next_state())
+                    pass
 
             # - STOP -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
             # Stop once we have finished our task
@@ -200,7 +211,7 @@ class StateMachine:
             # Stop if we encounter a hazard on the road
             elif self.state == HAZARD:  # TODO: How do we react to a hazard? Stop? Go Around?
                 if self.is_transition:
-                    self.controller.set_target(-100, -100)
+                    self.controller.set_target(0, 0)
 
                 if self.controller.target_met():
                     self.update_state(STOP)
@@ -212,7 +223,7 @@ class StateMachine:
                     self.controller.set_target(self.custom_target_left, self.custom_target_right)
                 # state transition
                 if self.controller.target_met():
-                    self.update_state(self.default_track_next_state())
+                    self.update_state(self.track_next_state())
 
             # - BACKWARDS -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
             elif self.state == BACKWARDS:
@@ -221,7 +232,7 @@ class StateMachine:
                     self.controller.set_target(self.custom_target_left, self.custom_target_right)
                 # state transition
                 if self.controller.target_met():
-                    self.update_state(self.default_track_next_state())
+                    self.update_state(self.track_next_state())
 
             # - ROTATE RIGHT -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
             elif self.state == ROTATE_RIGHT:
@@ -230,7 +241,7 @@ class StateMachine:
                     self.controller.set_target(self.custom_target_left, self.custom_target_right)
                 # state transition
                 if self.controller.target_met():
-                    self.update_state(self.default_track_next_state())
+                    self.update_state(self.track_next_state())
 
             # - ROTATE LEFT -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
             elif self.state == ROTATE_LEFT:
@@ -239,7 +250,7 @@ class StateMachine:
                     self.controller.set_target(self.custom_target_left, self.custom_target_right)
                 # state transition
                 if self.controller.target_met():
-                    self.update_state(self.default_track_next_state())
+                    self.update_state(self.track_next_state())
 
             # - PARKING -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
             elif self.state == PARKING:
@@ -248,7 +259,7 @@ class StateMachine:
                     self.controller.set_target(self.custom_target_left, self.custom_target_right)
                 # state transition
                 if self.controller.target_met():
-                    self.update_state(self.default_track_next_state())
+                    self.update_state(self.track_next_state())
 
             # - UNPARKING -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
             elif self.state == UNPARKING:
@@ -257,7 +268,7 @@ class StateMachine:
                     self.controller.set_target(self.custom_target_left, self.custom_target_right)
                 # state transition
                 if self.controller.target_met():
-                    self.update_state(self.default_track_next_state())
+                    self.update_state(self.track_next_state())
             # - CUSTOM -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
             elif self.state == CUSTOM:
                 # set target for travel
@@ -265,7 +276,7 @@ class StateMachine:
                     self.controller.set_target(self.custom_target_left, self.custom_target_right)
                 # state transition
                 if self.controller.target_met():
-                    self.update_state(self.default_track_next_state())
+                    self.update_state(self.track_next_state())
             # - - - - - - - - - - - - - - - - - - - - CONTROL MOTORS - - - - - - - - - - - - - - - - - - - - #
             self.controller.set_max_duty(self.max_speed)
             self.vehicle.set_motor(*self.controller.run())

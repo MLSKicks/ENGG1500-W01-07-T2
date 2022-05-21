@@ -1,26 +1,10 @@
-from machine import ADC
+from machine import Pin
 
 
 class InfraRed:
-    def __init__(self, analog_pin):
+    def __init__(self, pin):
         """Initialise IR Sensor object"""
-        self.adc = ADC(analog_pin)
+        self.ir = Pin(pin, Pin.IN)
 
-        # sensitivity constants
-        self.SENSITIVITY = 10000  # any analog voltage above this is considered 'road'
-
-    def set_sensitivity(self, sensitivity):
-        self.SENSITIVITY = sensitivity
-
-    def get_sensitivity(self):
-        return self.SENSITIVITY
-
-    def is_on_road(self):
-        reading = self.reading()
-        if reading > self.SENSITIVITY:
-            return True
-        else:
-            return False
-
-    def reading(self):
-        return self.adc.read_u16()  # value between 0 - 65535
+    def is_hazard(self):
+        return not self.ir.value()
