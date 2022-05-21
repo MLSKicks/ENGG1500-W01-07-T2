@@ -84,6 +84,7 @@ class StateMachine:
         self.DEPLOY_SENSOR_TIMEOUT = 1000  # ms
         self.SPLASH_SCREEN_TIMEOUT = 1000  # ms
         self.STATE_CHANGE_DELAY = 1000  # ms
+        self.HAZARD_RUNBACK_MM = 20  # mm
 
         # Other initialisation
         self.vehicle = Vehicle(motor=True, enc=True, screen=True, ir_f=True, ir_b=False)
@@ -254,7 +255,7 @@ class StateMachine:
             # Stop if we encounter a hazard in front of us on the road
             elif self.state == HAZARD_FORWARDS:  # TODO: Timeout go around hazard?
                 if self.is_transition:
-                    self.controller.set_target(0, 0)
+                    self.controller.set_target(-self.HAZARD_RUNBACK_MM, -self.HAZARD_RUNBACK_MM)  # TODO: INF LOOPS?
 
                 if not hazard_forwards:  # if object has moved
                     self.update_state(self.hazard_callback_state)
@@ -271,7 +272,7 @@ class StateMachine:
             # Stop if we encounter a hazard behind us on the road
             elif self.state == HAZARD_BACKWARDS:  # TODO: Timeout go around hazard?
                 if self.is_transition:
-                    self.controller.set_target(0, 0)
+                    self.controller.set_target(self.HAZARD_RUNBACK_MM, self.HAZARD_RUNBACK_MM)  # TODO: INF LOOPS?
 
                 if not hazard_backwards:  # if object has moved
                     self.update_state(self.hazard_callback_state)
