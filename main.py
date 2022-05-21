@@ -16,7 +16,8 @@ NULL = -1
 SPLASH_SCREEN = 0
 PRINT_ROAD_INFO = 1
 STOP = 3
-HAZARD = 4
+HAZARD_FORWARDS = 4
+HAZARD_BACKWARDS = 5
 FORWARDS = 100
 BACKWARDS = 101
 ROTATE_LEFT = 102
@@ -49,8 +50,8 @@ track_states = [
     (FORWARDS, 2430*v_sf, 2430*v_sf, 45),  # forwards
 
     # reverse in
-    (ROTATE_LEFT, -100, 100, 50),   # rotate right
-    (PARKING, -550*h_sf, -550*h_sf, 45),  # backwards
+    (ROTATE_RIGHT, 100, -100, 50),   # rotate right
+    (PARKING, 550*h_sf, 550*h_sf, 45),  # forwards
     STOP
 ]
 
@@ -67,6 +68,8 @@ class StateMachine:
         self.track_counter = 0
         self.custom_target_left, self.custom_target_right = 0, 0
         self.max_speed = 65
+        self.HAZARD_TIMEOUT = 5000  # ms
+        self.DEPLOY_SENSOR_TIMEOUT = 1000 # ms
 
         # Other initialisation
         self.vehicle = Vehicle(motor=True, enc=True, screen=True, ir_f=True, ir_b=False)
@@ -108,8 +111,10 @@ class StateMachine:
                 self.screen.print("State: Road Info")
             elif self.state == STOP:
                 self.screen.print("State: Stopped\n\nMy job is done!")
-            elif self.state == HAZARD:
-                self.screen.print("State: Hazard\n\nSomething got in\n my way!")
+            elif self.state == HAZARD_FORWARDS:
+                self.screen.print("State: Hazard\n\nSomething is in\nfront of me!")
+            elif self.state == HAZARD_BACKWARDS:
+                self.screen.print("State: Hazard\n\nSomething is be-\nhind me!")
             elif self.state == FORWARDS:
                 self.screen.print("State: Travell-\ning Forwards")
             elif self.state == BACKWARDS:
@@ -165,10 +170,17 @@ class StateMachine:
             hazard_backwards = False
 
             # - - - - - - - - - - - - - - - - - - - - GLOBAL TRANSITIONS - - - - - - - - - - - - - - - - - - - - #
-            if hazard_forwards or hazard_backwards:  # Something is in front so lets stop
-                self.update_state(HAZARD)
-                # TODO: REMEMBER PREVIOUS STATE AND ERROR SO THAT WE CAN GO BACK TO THAT STATE ONCE HAZARD IS GONE
-                # TODO: LOGIC TO NOT GO TO HAZARD STATE IF WE AREN'T MOVING TOWARDS A HAZARD
+            if hazard_forwards:  # Something is in front so lets stop ...
+                # only if we are currently travelling forwards
+                if self.state == FORWARDS or self.state == PARKING:
+                    self.update_state(HAZARD_FORWARDS)
+                    self.custom_target_left, self.custom_target_right = self.controller.get_remainder_target()
+
+            if hazard_backwards:  # Something is behind us so lets stop ...
+                # only if we are currently travelling backwards
+                if self.state == BACKWARDS or self.state == UNPARKING:
+                    self.update_state(HAZARD_BACKWARDS)
+                    self.custom_target_left, self.custom_target_right = self.controller.get_remainder_target()
 
             # - - - - - - - - - - - - - - - - - - - - STATE MACHINE HEADER - - - - - - - - - - - - - - - - - - - #
             self.update_state_variables()  # Updates prev_state and is_transition flag
@@ -189,8 +201,14 @@ class StateMachine:
                 if self.is_transition:
                     self.controller.set_target(0, 0)
 
-                if self.elapsed_ms() > 1000:
+                if self.elapsed_ms() > self.DEPLOY_SENSOR_TIMEOUT:  # wait until sensors are deployed
                     self.update_state(self.track_next_state())
+                elif self.elapsed_ms() > self.DEPLOY_SENSOR_TIMEOUT*3/4:
+                    self.screen.print_variable(". . .", 5, 4)
+                elif self.elapsed_ms() > self.DEPLOY_SENSOR_TIMEOUT*2/4:
+                    self.screen.print_variable(". .", 5, 4)
+                elif self.elapsed_ms() > self.DEPLOY_SENSOR_TIMEOUT*1/4:
+                    self.screen.print_variable(".", 5, 4)
 
             # - PRINT_ROAD_INFO -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
             # Displays what our IR sensors are saying
@@ -209,14 +227,40 @@ class StateMachine:
                 if self.is_transition:
                     self.controller.set_target(0, 0)
 
-            # - HAZARD -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
-            # Stop if we encounter a hazard on the road
-            elif self.state == HAZARD:  # TODO: How do we react to a hazard? Stop? Go Around?
+            # - HAZARDS -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
+            # Stop if we encounter a hazard in front of us on the road
+            elif self.state == HAZARD_FORWARDS:  # TODO: Timeout go around hazard?
                 if self.is_transition:
                     self.controller.set_target(0, 0)
 
-                if self.controller.target_met():
+                if not hazard_forwards:  # if object has moved
+                    self.update_state(self.prev_state)
+
+                if self.elapsed_ms() > self.HAZARD_TIMEOUT:  # if object does not move, we quit
                     self.update_state(STOP)
+                elif self.elapsed_ms() > self.HAZARD_TIMEOUT*3/4:
+                    self.screen.print_variable(". . .", 5, 4)
+                elif self.elapsed_ms() > self.HAZARD_TIMEOUT*2/4:
+                    self.screen.print_variable(". .", 5, 4)
+                elif self.elapsed_ms() > self.HAZARD_TIMEOUT*1/4:
+                    self.screen.print_variable(".", 5, 4)
+
+            # Stop if we encounter a hazard behind us on the road
+            elif self.state == HAZARD_BACKWARDS:  # TODO: Timeout go around hazard?
+                if self.is_transition:
+                    self.controller.set_target(0, 0)
+
+                if not hazard_backwards:  # if object has moved
+                    self.update_state(self.prev_state)
+
+                if self.elapsed_ms() > self.HAZARD_TIMEOUT:  # if object does not move, we quit
+                    self.update_state(STOP)
+                elif self.elapsed_ms() > self.HAZARD_TIMEOUT*3/4:
+                    self.screen.print_variable(". . .", 5, 4)
+                elif self.elapsed_ms() > self.HAZARD_TIMEOUT*2/4:
+                    self.screen.print_variable(". .", 5, 4)
+                elif self.elapsed_ms() > self.HAZARD_TIMEOUT*1/4:
+                    self.screen.print_variable(".", 5, 4)
 
             # - FORWARDS -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
             elif self.state == FORWARDS:
@@ -271,6 +315,7 @@ class StateMachine:
                 # state transition
                 if self.controller.target_met():
                     self.update_state(self.track_next_state())
+
             # - CUSTOM -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
             elif self.state == CUSTOM:
                 # set target for travel
