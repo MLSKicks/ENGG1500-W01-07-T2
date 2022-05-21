@@ -257,7 +257,7 @@ class StateMachine:
                     self.update_state(self.hazard_callback_state)
 
                 if self.elapsed_ms() > self.HAZARD_TIMEOUT:  # if object does not move, we quit
-                    self.update_state(STOP)
+                    self.update_state(HAZARD_FORWARDS_BYPASS)
                 elif self.elapsed_ms() > self.HAZARD_TIMEOUT*(3/4):
                     self.screen.print_variable(". . .", 5, 5)
                 elif self.elapsed_ms() > self.HAZARD_TIMEOUT*(2/4):
@@ -274,7 +274,7 @@ class StateMachine:
                     self.update_state(self.hazard_callback_state)
 
                 if self.elapsed_ms() > self.HAZARD_TIMEOUT:  # if object does not move, we quit
-                    self.update_state(STOP)
+                    self.update_state(HAZARD_BACKWARDS_BYPASS)
                 elif self.elapsed_ms() > self.HAZARD_TIMEOUT*(3/4):
                     self.screen.print_variable(". . .", 5, 5)
                 elif self.elapsed_ms() > self.HAZARD_TIMEOUT*(2/4):
