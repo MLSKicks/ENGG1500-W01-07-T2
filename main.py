@@ -287,6 +287,7 @@ class StateMachine:
                 if self.is_transition:  # rotate left
                     self.controller.set_target(-100, 100)
                 if self.controller.target_met():
+                    sleep_ms(self.STATE_CHANGE_DELAY)  # (make sure we are stopped after each target)
                     if self.state_phase == 0:  # travel forwards a little
                         self.controller.set_target(100, 100)
                         self.state_phase += 1
@@ -300,6 +301,7 @@ class StateMachine:
                 if self.is_transition:  # rotate left
                     self.controller.set_target(-100, 100)
                 if self.controller.target_met():
+                    sleep_ms(self.STATE_CHANGE_DELAY)  # (make sure we are stopped after each target)
                     if self.state_phase == 0:  # travel backwards a little
                         self.controller.set_target(-100, -100)
                         self.state_phase += 1
