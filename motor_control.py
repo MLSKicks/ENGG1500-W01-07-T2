@@ -201,7 +201,7 @@ class MotorController:
             sideways_error = clamp(sideways_error, 25, -25)  # clamp to |25|
             # if our error is smaller on the right compared to the left, we want to increase
             # the left motor
-        print("sideways_error=", sideways_error)
+        # print("sideways_error=", sideways_error)
         return int(lduty + lpolarity*self.bias + lpolarity*sideways_error), \
             int(rduty - rpolarity*self.bias - rpolarity*sideways_error)
 

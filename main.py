@@ -59,6 +59,7 @@ track_states = [
 # - - - - - - - - - - - - - - - - - - - - - STATE MACHINE - - - - - - - - - - - - - - - - - - - - - - - #
 class StateMachine:
     def __init__(self, initial_state):
+        self.hazard_callback_state = NULL  # State to re-enter after avoiding a hazard
         self.prev_state = NULL  # Previous state
         self.state = initial_state  # Current state
         self.is_transition = True  # Transition flag telling us if we just switched states
@@ -72,6 +73,7 @@ class StateMachine:
         self.HAZARD_TIMEOUT = 5000  # ms
         self.DEPLOY_SENSOR_TIMEOUT = 1000  # ms
         self.SPLASH_SCREEN_TIMEOUT = 1000  # ms
+        self.STATE_CHANGE_DELAY = 1000  # ms
 
         # Other initialisation
         self.vehicle = Vehicle(motor=True, enc=True, screen=True, ir_f=True, ir_b=False)
@@ -85,13 +87,12 @@ class StateMachine:
         self.is_transition = is_transition
 
     def update_state_variables(self):
-        """Updates our transition flag (is_transition).
-        The transition flag tells us if we have just transitioned to a new state. This is helpful
-        in running a piece of code in a state one and once only."""
+        """Updates our transition flag (is_transition). This is dirty set it and forget it code...
+        It automatically sets the is_transition flag so that it is only True for the first loop
+        of a new state"""
         if self.prev_state == self.state:
             if self.is_transition:
                 if self.update_is_transition:
-                    self.t0 = ticks_ms()
                     self.update_is_transition = False
                     self.is_transition = False
                 else:
@@ -99,6 +100,9 @@ class StateMachine:
         else:
             self.update_is_transition = True
         self.prev_state = self.state
+
+        if self.is_transition:
+            self.t0 = ticks_ms()
 
     def print_state(self):
         """Print out what state we are in"""
@@ -139,6 +143,7 @@ class StateMachine:
         return ticks_diff(ticks_ms(), self.t0)
 
     def track_next_state(self):
+        """Gets the next state in the queue"""
         next_state = track_states[self.track_counter]
 
         if type(next_state) is tuple:
@@ -148,7 +153,7 @@ class StateMachine:
             next_state = next_state[0]
 
         self.track_counter += 1
-        sleep_ms(1000)
+        sleep_ms(self.STATE_CHANGE_DELAY)
         return next_state
 
     # - - - - - - - - - - - - - - - - - - - - - - MAIN STATE MACHINE - - - - - - - - - - - - - - - - - - - - - - - #
@@ -175,12 +180,14 @@ class StateMachine:
             if hazard_forwards:  # Something is in front so lets stop ...
                 # only if we are currently travelling forwards
                 if self.state == FORWARDS or self.state == PARKING:
+                    self.hazard_callback_state = self.state
                     self.update_state(HAZARD_FORWARDS)
                     self.custom_target_left, self.custom_target_right = self.controller.get_remainder_target()
 
             if hazard_backwards:  # Something is behind us so lets stop ...
                 # only if we are currently travelling backwards
                 if self.state == BACKWARDS or self.state == UNPARKING:
+                    self.hazard_callback_state = self.state
                     self.update_state(HAZARD_BACKWARDS)
                     self.custom_target_left, self.custom_target_right = self.controller.get_remainder_target()
 
@@ -199,17 +206,21 @@ class StateMachine:
                     self.update_state(self.track_next_state())
 
             # - DEPLOY_SENSOR -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
-            if self.state == DEPLOY_SENSOR:
+            elif self.state == DEPLOY_SENSOR:
                 if self.is_transition:
                     self.controller.set_target(0, 0)
-
+                print("elapsed_ms() = ", self.elapsed_ms())
                 if self.elapsed_ms() > self.DEPLOY_SENSOR_TIMEOUT:  # wait until sensors are deployed
                     self.update_state(self.track_next_state())
-                elif self.elapsed_ms() > self.DEPLOY_SENSOR_TIMEOUT*3/4:
+                    print("Done")
+                elif self.elapsed_ms() > self.DEPLOY_SENSOR_TIMEOUT*(3/4):
+                    print("WHAT\nWHAT\nWHAT\nWHAT!!!")
                     self.screen.print_variable(". . .", 5, 4)
-                elif self.elapsed_ms() > self.DEPLOY_SENSOR_TIMEOUT*2/4:
+                elif self.elapsed_ms() > self.DEPLOY_SENSOR_TIMEOUT*(2/4):
+                    print("WHAT\nWHAT\nWHAT\nWHAT!")
                     self.screen.print_variable(". .", 5, 4)
-                elif self.elapsed_ms() > self.DEPLOY_SENSOR_TIMEOUT*1/4:
+                elif self.elapsed_ms() > self.DEPLOY_SENSOR_TIMEOUT*(1/4):
+                    print("WHAT\nWHAT\nWHAT\nWHAT!")
                     self.screen.print_variable(".", 5, 4)
 
             # - PRINT_ROAD_INFO -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
@@ -236,16 +247,16 @@ class StateMachine:
                     self.controller.set_target(0, 0)
 
                 if not hazard_forwards:  # if object has moved
-                    self.update_state(self.prev_state)
+                    self.update_state(self.hazard_callback_state)
 
                 if self.elapsed_ms() > self.HAZARD_TIMEOUT:  # if object does not move, we quit
                     self.update_state(STOP)
-                elif self.elapsed_ms() > self.HAZARD_TIMEOUT*3/4:
-                    self.screen.print_variable(". . .", 5, 4)
-                elif self.elapsed_ms() > self.HAZARD_TIMEOUT*2/4:
-                    self.screen.print_variable(". .", 5, 4)
-                elif self.elapsed_ms() > self.HAZARD_TIMEOUT*1/4:
-                    self.screen.print_variable(".", 5, 4)
+                elif self.elapsed_ms() > self.HAZARD_TIMEOUT*(3/4):
+                    self.screen.print_variable(". . .", 5, 5)
+                elif self.elapsed_ms() > self.HAZARD_TIMEOUT*(2/4):
+                    self.screen.print_variable(". .", 5, 5)
+                elif self.elapsed_ms() > self.HAZARD_TIMEOUT*(1/4):
+                    self.screen.print_variable(".", 5, 5)
 
             # Stop if we encounter a hazard behind us on the road
             elif self.state == HAZARD_BACKWARDS:  # TODO: Timeout go around hazard?
@@ -253,20 +264,20 @@ class StateMachine:
                     self.controller.set_target(0, 0)
 
                 if not hazard_backwards:  # if object has moved
-                    self.update_state(self.prev_state)
+                    self.update_state(self.hazard_callback_state)
 
                 if self.elapsed_ms() > self.HAZARD_TIMEOUT:  # if object does not move, we quit
                     self.update_state(STOP)
-                elif self.elapsed_ms() > self.HAZARD_TIMEOUT*3/4:
-                    self.screen.print_variable(". . .", 5, 4)
-                elif self.elapsed_ms() > self.HAZARD_TIMEOUT*2/4:
-                    self.screen.print_variable(". .", 5, 4)
-                elif self.elapsed_ms() > self.HAZARD_TIMEOUT*1/4:
-                    self.screen.print_variable(".", 5, 4)
+                elif self.elapsed_ms() > self.HAZARD_TIMEOUT*(3/4):
+                    self.screen.print_variable(". . .", 5, 5)
+                elif self.elapsed_ms() > self.HAZARD_TIMEOUT*(2/4):
+                    self.screen.print_variable(". .", 5, 5)
+                elif self.elapsed_ms() > self.HAZARD_TIMEOUT*(1/4):
+                    self.screen.print_variable(".", 5, 5)
 
             # - FORWARDS -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
             elif self.state == FORWARDS:
-                # set target for travel
+                # set initial target for travel
                 if self.is_transition:
                     self.controller.set_target(self.custom_target_left, self.custom_target_right)
                 # state transition
@@ -275,7 +286,7 @@ class StateMachine:
 
             # - BACKWARDS -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
             elif self.state == BACKWARDS:
-                # set target for travel
+                # set initial target for travel
                 if self.is_transition:
                     self.controller.set_target(self.custom_target_left, self.custom_target_right)
                 # state transition
@@ -284,7 +295,7 @@ class StateMachine:
 
             # - ROTATE RIGHT -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
             elif self.state == ROTATE_RIGHT:
-                # set target for travel
+                # set initial target for travel
                 if self.is_transition:
                     self.controller.set_target(self.custom_target_left, self.custom_target_right)
                 # state transition
@@ -293,7 +304,7 @@ class StateMachine:
 
             # - ROTATE LEFT -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
             elif self.state == ROTATE_LEFT:
-                # set target for travel
+                # set initial target for travel
                 if self.is_transition:
                     self.controller.set_target(self.custom_target_left, self.custom_target_right)
                 # state transition
@@ -302,7 +313,7 @@ class StateMachine:
 
             # - PARKING -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
             elif self.state == PARKING:
-                # set target for travel
+                # set initial target for travel
                 if self.is_transition:
                     self.controller.set_target(self.custom_target_left, self.custom_target_right)
                 # state transition
@@ -311,7 +322,7 @@ class StateMachine:
 
             # - UNPARKING -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
             elif self.state == UNPARKING:
-                # set target for travel
+                # set initial target for travel
                 if self.is_transition:
                     self.controller.set_target(self.custom_target_left, self.custom_target_right)
                 # state transition
@@ -320,7 +331,7 @@ class StateMachine:
 
             # - CUSTOM -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
             elif self.state == CUSTOM:
-                # set target for travel
+                # set initial target for travel
                 if self.is_transition:
                     self.controller.set_target(self.custom_target_left, self.custom_target_right)
                 # state transition
@@ -355,7 +366,5 @@ def test2_controller(target_mm_l, target_mm_r, max_duty, bias=3, loops=30, sleep
 
 
 if __name__ == "__main__":
-    # sleep_ms(1000)
-    # complete_basic_track()
     statemachine = StateMachine(SPLASH_SCREEN)
     statemachine.main()
