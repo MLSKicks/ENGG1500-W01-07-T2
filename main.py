@@ -14,18 +14,24 @@ ascii_cat = ("State: PRINT_ART\n\n    _,,/|\n"
 # - - - - - - - - - - - - - - - - - - - - - - - STATE ENUMERATION - - - - - - - - - - - - - - - - - - - - - - - #
 NULL = -1
 SPLASH_SCREEN = 0
-PRINT_ROAD_INFO = 1
-STOP = 3
-HAZARD_FORWARDS = 4
-HAZARD_BACKWARDS = 5
+STOP = 1
+PRINT_ROAD_INFO = 2
+
+DEPLOY_SENSOR = 3
+
+HAZARD_FORWARDS = 200
+HAZARD_BACKWARDS = 201
+HAZARD_FORWARDS_BYPASS = 202
+HAZARD_BACKWARDS_BYPASS = 203
+
 FORWARDS = 100
 BACKWARDS = 101
 ROTATE_LEFT = 102
 ROTATE_RIGHT = 103
-CUSTOM = 104
-PARKING = 105
-UNPARKING = 106
-DEPLOY_SENSOR = 107
+PARKING = 104
+UNPARKING = 105
+CUSTOM = 106
+
 
 # ! ! ! ! ! ! ! ! ! EDIT HERE ! ! ! ! ! ! ! ! ! ! #
 
@@ -62,6 +68,7 @@ class StateMachine:
         self.hazard_callback_state = NULL  # State to re-enter after avoiding a hazard
         self.prev_state = NULL  # Previous state
         self.state = initial_state  # Current state
+        self.state_phase = 0
         self.is_transition = True  # Transition flag telling us if we just switched states
         self.update_is_transition = False  # Flag tells us to update is_transition to false
         self.t0 = ticks_ms()  # For calculating time spent in a state
@@ -84,6 +91,7 @@ class StateMachine:
         """Update our current state"""
         self.prev_state = self.state
         self.state = new_state
+        self.state_phase = 0
         self.is_transition = is_transition
 
     def update_state_variables(self):
@@ -118,9 +126,13 @@ class StateMachine:
             elif self.state == STOP:
                 self.screen.print("State: Stopped\n\nMy job is done!")
             elif self.state == HAZARD_FORWARDS:
-                self.screen.print("State: Hazard\n\nSomething is in\nfront of me!")
+                self.screen.print("State: Hazard\n\nAn object is in\nfront of me!\nWaiting:")
             elif self.state == HAZARD_BACKWARDS:
-                self.screen.print("State: Hazard\n\nSomething is be-\nhind me!")
+                self.screen.print("State: Hazard\n\nAn object is be-\nhind me!\nWaiting:")
+            elif self.state == HAZARD_FORWARDS_BYPASS:
+                self.screen.print("State: Bypassing\n\nTrying to dodge\nan object in fr-\nont of me!")
+            elif self.state == HAZARD_BACKWARDS_BYPASS:
+                self.screen.print("State: Bypassing\n\nTrying to dodge\nan object be-\nhind me!")
             elif self.state == FORWARDS:
                 self.screen.print("State: Travell-\ning Forwards")
             elif self.state == BACKWARDS:
@@ -132,9 +144,9 @@ class StateMachine:
             elif self.state == CUSTOM:
                 self.screen.print("State: Custom")
             elif self.state == PARKING:
-                self.screen.print("State: parking")
+                self.screen.print("State: Parking")
             elif self.state == UNPARKING:
-                self.screen.print("State: unparking")
+                self.screen.print("State: Unparking")
             else:
                 self.screen.print("State: Not Found")
 
@@ -209,18 +221,13 @@ class StateMachine:
             elif self.state == DEPLOY_SENSOR:
                 if self.is_transition:
                     self.controller.set_target(0, 0)
-                print("elapsed_ms() = ", self.elapsed_ms())
                 if self.elapsed_ms() > self.DEPLOY_SENSOR_TIMEOUT:  # wait until sensors are deployed
                     self.update_state(self.track_next_state())
-                    print("Done")
                 elif self.elapsed_ms() > self.DEPLOY_SENSOR_TIMEOUT*(3/4):
-                    print("WHAT\nWHAT\nWHAT\nWHAT!!!")
                     self.screen.print_variable(". . .", 5, 4)
                 elif self.elapsed_ms() > self.DEPLOY_SENSOR_TIMEOUT*(2/4):
-                    print("WHAT\nWHAT\nWHAT\nWHAT!")
                     self.screen.print_variable(". .", 5, 4)
                 elif self.elapsed_ms() > self.DEPLOY_SENSOR_TIMEOUT*(1/4):
-                    print("WHAT\nWHAT\nWHAT\nWHAT!")
                     self.screen.print_variable(".", 5, 4)
 
             # - PRINT_ROAD_INFO -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
@@ -274,6 +281,33 @@ class StateMachine:
                     self.screen.print_variable(". .", 5, 5)
                 elif self.elapsed_ms() > self.HAZARD_TIMEOUT*(1/4):
                     self.screen.print_variable(".", 5, 5)
+
+            # - HAZARDS REACTIONS -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
+            elif self.state == HAZARD_FORWARDS_BYPASS:
+                if self.is_transition:  # rotate left
+                    self.controller.set_target(-100, 100)
+                if self.controller.target_met():
+                    if self.state_phase == 0:  # travel forwards a little
+                        self.controller.set_target(100, 100)
+                        self.state_phase += 1
+                    elif self.state_phase == 1:  # rotate right, and ...
+                        self.controller.set_target(100, -100)
+                        self.state_phase += 1
+                    elif self.state_phase == 2:  # ... hopefully we are clear!
+                        self.update_state(self.hazard_callback_state)
+
+            elif self.state == HAZARD_BACKWARDS_BYPASS:
+                if self.is_transition:  # rotate left
+                    self.controller.set_target(-100, 100)
+                if self.controller.target_met():
+                    if self.state_phase == 0:  # travel backwards a little
+                        self.controller.set_target(-100, -100)
+                        self.state_phase += 1
+                    elif self.state_phase == 1:  # rotate right, and ...
+                        self.controller.set_target(100, -100)
+                        self.state_phase += 1
+                    elif self.state_phase == 2:  # ... hopefully we are clear!
+                        self.update_state(self.hazard_callback_state)
 
             # - FORWARDS -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
             elif self.state == FORWARDS:
