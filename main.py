@@ -305,7 +305,10 @@ class StateMachine:
                         self.state_phase += 1
 
                     elif self.state_phase == 2:  # ... hopefully we are clear!
-                        self.update_state(self.hazard_callback_state)
+                        if hazard_forwards:
+                            self.update_state(HAZARD_BACKWARDS_BYPASS)  # try, try, try again
+                        else:
+                            self.update_state(self.hazard_callback_state)
 
             elif self.state == HAZARD_BACKWARDS_BYPASS:
                 if self.is_transition:  # rotate left
@@ -325,7 +328,10 @@ class StateMachine:
                         self.state_phase += 1
 
                     elif self.state_phase == 2:  # ... hopefully we are clear!
-                        self.update_state(self.hazard_callback_state)
+                        if hazard_backwards:
+                            self.update_state(HAZARD_BACKWARDS_BYPASS)  # try, try, try again
+                        else:
+                            self.update_state(self.hazard_callback_state)
 
             # - FORWARDS -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
             elif self.state == FORWARDS:
