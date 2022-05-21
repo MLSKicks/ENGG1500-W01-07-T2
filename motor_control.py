@@ -70,10 +70,14 @@ class MotorController:
         self.amplitude = amplitude   # Amplitude of the output function
         self.base_duty = base_duty   # Base duty value of the output function
         self.offset_amount = offset  # Offset for the output function
+        self.STRAIGHT_LINE_TRAVEL = True
 
     def set_max_duty(self, max_duty):
         self.max_duty = abs(max_duty)
         self.min_duty = -abs(max_duty)
+
+    def get_remainder_target(self):
+        return self.error_left, self.error_right
 
     def run(self):
         """Calculates the pwm values using a closed feedback loop"""
@@ -192,7 +196,7 @@ class MotorController:
             rpolarity = -1
 
         sideways_error = 0
-        if abs(self.target_mm_left) == abs(self.target_mm_right):
+        if self.STRAIGHT_LINE_TRAVEL:
             sideways_error = 50*(abs(self.error_left) - abs(self.error_right))
             sideways_error = clamp(sideways_error, 25, -25)  # clamp to |25|
             # if our error is smaller on the right compared to the left, we want to increase
