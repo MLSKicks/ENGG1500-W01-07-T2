@@ -11,6 +11,9 @@ ascii_cat = ("State: PRINT_ART\n\n    _,,/|\n"
              "   (////_)//\n"
              "   ~~~")
 
+ROTATE_PWM = 50
+STRAIGHT_PWM = 45
+
 # - - - - - - - - - - - - - - - - - - - - - - - STATE ENUMERATION - - - - - - - - - - - - - - - - - - - - - - - #
 NULL = -1
 SPLASH_SCREEN = 0
@@ -40,24 +43,24 @@ h_sf = 1  # horizontal scale factor
 
 track_states = [
     # reverse out
-    (UNPARKING, -550*h_sf, -550*h_sf, 45),  # backwards
-    (ROTATE_RIGHT, 100, -100, 50),   # rotate right
+    (UNPARKING, -550*h_sf, -550*h_sf, STRAIGHT_PWM),  # backwards
+    (ROTATE_RIGHT, 100, -100, ROTATE_PWM),   # rotate right
 
     # get to first roundabout
-    (FORWARDS, 750*v_sf, 750*v_sf, 45),   # forwards
+    (FORWARDS, 750*v_sf, 750*v_sf, STRAIGHT_PWM),   # forwards
     DEPLOY_SENSOR,
 
     # get to second roundabout
-    (FORWARDS, 1650*v_sf, 1650*v_sf, 45),  # forwards
+    (FORWARDS, 1650*v_sf, 1650*v_sf, STRAIGHT_PWM),  # forwards
     DEPLOY_SENSOR,
 
     # return home
-    (ROTATE_RIGHT, 200, -200, 50),   # rotate right
-    (FORWARDS, 2430*v_sf, 2430*v_sf, 45),  # forwards
+    (ROTATE_RIGHT, 200, -200, ROTATE_PWM),   # rotate right
+    (FORWARDS, 2430*v_sf, 2430*v_sf, STRAIGHT_PWM),  # forwards
 
     # reverse in
-    (ROTATE_RIGHT, 100, -100, 50),   # rotate right
-    (PARKING, 550*h_sf, 550*h_sf, 45),  # forwards
+    (ROTATE_RIGHT, 100, -100, ROTATE_PWM),   # rotate right
+    (PARKING, 550*h_sf, 550*h_sf, STRAIGHT_PWM),  # forwards
     STOP
 ]
 
@@ -285,29 +288,41 @@ class StateMachine:
             # - HAZARDS REACTIONS -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
             elif self.state == HAZARD_FORWARDS_BYPASS:
                 if self.is_transition:  # rotate left
+                    self.max_speed = ROTATE_PWM
                     self.controller.set_target(-100, 100)
+
                 if self.controller.target_met():
                     sleep_ms(self.STATE_CHANGE_DELAY)  # (make sure we are stopped after each target)
                     if self.state_phase == 0:  # travel forwards a little
+                        self.max_speed = STRAIGHT_PWM
                         self.controller.set_target(100, 100)
                         self.state_phase += 1
+
                     elif self.state_phase == 1:  # rotate right, and ...
+                        self.max_speed = ROTATE_PWM
                         self.controller.set_target(100, -100)
                         self.state_phase += 1
+
                     elif self.state_phase == 2:  # ... hopefully we are clear!
                         self.update_state(self.hazard_callback_state)
 
             elif self.state == HAZARD_BACKWARDS_BYPASS:
                 if self.is_transition:  # rotate left
+                    self.max_speed = ROTATE_PWM
                     self.controller.set_target(-100, 100)
+
                 if self.controller.target_met():
                     sleep_ms(self.STATE_CHANGE_DELAY)  # (make sure we are stopped after each target)
                     if self.state_phase == 0:  # travel backwards a little
+                        self.max_speed = STRAIGHT_PWM
                         self.controller.set_target(-100, -100)
                         self.state_phase += 1
+
                     elif self.state_phase == 1:  # rotate right, and ...
+                        self.max_speed = ROTATE_PWM
                         self.controller.set_target(100, -100)
                         self.state_phase += 1
+
                     elif self.state_phase == 2:  # ... hopefully we are clear!
                         self.update_state(self.hazard_callback_state)
 
