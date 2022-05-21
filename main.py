@@ -306,7 +306,7 @@ class StateMachine:
 
                     elif self.state_phase == 2:  # ... hopefully we are clear!
                         if hazard_forwards:
-                            self.update_state(HAZARD_BACKWARDS_BYPASS)  # try, try, try again
+                            self.update_state(HAZARD_FORWARDS_BYPASS)  # try, try, try again
                         else:
                             self.update_state(self.hazard_callback_state)
 
