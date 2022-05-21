@@ -167,6 +167,8 @@ class StateMachine:
             # - - - - - - - - - - - - - - - - - - - - GLOBAL TRANSITIONS - - - - - - - - - - - - - - - - - - - - #
             if hazard_forwards or hazard_backwards:  # Something is in front so lets stop
                 self.update_state(HAZARD)
+                # TODO: REMEMBER PREVIOUS STATE AND ERROR SO THAT WE CAN GO BACK TO THAT STATE ONCE HAZARD IS GONE
+                # TODO: LOGIC TO NOT GO TO HAZARD STATE IF WE AREN'T MOVING TOWARDS A HAZARD
 
             # - - - - - - - - - - - - - - - - - - - - STATE MACHINE HEADER - - - - - - - - - - - - - - - - - - - #
             self.update_state_variables()  # Updates prev_state and is_transition flag
