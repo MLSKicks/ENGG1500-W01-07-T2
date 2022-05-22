@@ -16,8 +16,8 @@ SLOW_STRAIGHT_PWM = 45
 SLOW_ROTATE_PWM = 40
 
 # rotations
-QUARTER_TURN = 105
-HALF_TURN = 210
+QUARTER_TURN = 106
+HALF_TURN = 212
 
 # avoidance methods
 NO_AVOIDANCE = 0
@@ -129,10 +129,10 @@ class StateMachine:
         self.track_counter = 0
         self.custom_target_left, self.custom_target_right = 0, 0
         self.max_speed = 65
-        self.HAZARD_TIMEOUT = 4000  # ms
-        self.DEPLOY_SENSOR_TIMEOUT = 600  # ms
+        self.HAZARD_TIMEOUT = 3500  # ms
+        self.DEPLOY_SENSOR_TIMEOUT = 500  # ms
         self.SPLASH_SCREEN_TIMEOUT = 600  # ms
-        self.STATE_CHANGE_DELAY = 1000  # ms
+        self.STATE_CHANGE_DELAY = 700  # ms
         self.HAZARD_RUNBACK_MM = 20  # mm
         self.HAZARD_BYPASS_MM = 250  # mm to travel around an obstacle
         self.HAZARD_CLEARANCE_MM = 300  # mm to travel forwards
@@ -192,9 +192,9 @@ class StateMachine:
             elif self.state == BACKWARDS:
                 self.screen.print_art("State: Backwards\n\n       |       \n       |       \n       V       ")
             elif self.state == ROTATE_LEFT:
-                self.screen.print_art("State: Left     \n\n     <--.       \n     `:         \n           |    ")
+                self.screen.print_art("State: Left     \n\n     <--.       \n         |      \n")
             elif self.state == ROTATE_RIGHT:
-                self.screen.print_art("State: Right    \n\n       .-->     \n     :`         \n    |           ")
+                self.screen.print_art("State: Right    \n\n       .-->     \n      |         \n")
             elif self.state == CUSTOM:
                 self.screen.print("State: Custom")
             elif self.state == PARKING:
@@ -208,14 +208,20 @@ class StateMachine:
         """Calculates the elapsed ms in the current state, relies on update_state_variables()"""
         return ticks_diff(ticks_ms(), self.t0)
 
-    def track_next_state(self):
+    def track_next_state(self, path_cut=0, skip=False):
         """Gets the next state in the queue"""
         self.vehicle.set_motor(0, 0)  # make us stop, so that we're not rolling and trick the pid control
+
+        # if skip:  # skip a roundabout due to a hazard
+        #     while((track_states[self.track_counter] is not tuple) or
+        #           (track_states[self.track_counter] is not DEPLOY_SENSOR)):
+        #         self.track_counter += 1
+
         next_state = track_states[self.track_counter]
 
         if type(next_state) is tuple:
-            self.custom_target_left = next_state[1]
-            self.custom_target_right = next_state[2]
+            self.custom_target_left = next_state[1]-path_cut
+            self.custom_target_right = next_state[2]-path_cut
             self.max_speed = next_state[3]
             self.avoidance_method = next_state[4]
             next_state = next_state[0]
@@ -235,9 +241,9 @@ class StateMachine:
 
     def veer_left(self):
         self.vehicle.set_motor(-45, 45)
-        sleep_ms(70)
-        self.vehicle.set_motor(40, -40)
-        sleep_ms(25)
+        sleep_ms(75)
+        self.vehicle.set_motor(45, -45)
+        sleep_ms(40)
         self.vehicle.set_motor(0, 0)
 
     # - - - - - - - - - - - - - - - - - - - - - - MAIN STATE MACHINE - - - - - - - - - - - - - - - - - - - - - - - #
@@ -291,11 +297,11 @@ class StateMachine:
                 if self.elapsed_ms() > self.DEPLOY_SENSOR_TIMEOUT:
                     self.update_state(self.track_next_state())
                 elif self.vehicle.has_screen():
-                    if self.elapsed_ms() > self.DEPLOY_SENSOR_TIMEOUT*(3/4):
-                        self.screen.print_variable(".", 5, 4)
-                    elif self.elapsed_ms() > self.DEPLOY_SENSOR_TIMEOUT*(2/4):
-                        self.screen.print_variable(". .", 5, 4)
-                    elif self.elapsed_ms() > self.DEPLOY_SENSOR_TIMEOUT*(1/4):
+                    if self.elapsed_ms() > self.DEPLOY_SENSOR_TIMEOUT*(6/7):
+                        self.screen.print_variable(".    ", 5, 4)
+                    elif self.elapsed_ms() > self.DEPLOY_SENSOR_TIMEOUT*(4/7):
+                        self.screen.print_variable(". .  ", 5, 4)
+                    elif self.elapsed_ms() > self.DEPLOY_SENSOR_TIMEOUT*(2/7):
                         self.screen.print_variable(". . .", 5, 4)
 
             # - PRINT_ROAD_INFO -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
@@ -329,14 +335,18 @@ class StateMachine:
                 if not hazard_forwards:  # if object has moved
                     self.update_state(self.hazard_callback_state)
 
-                if self.elapsed_ms() > self.HAZARD_TIMEOUT:  # if object does not move, we quit
-                    self.update_state(HAZARD_FORWARDS_BYPASS)
+                if self.elapsed_ms() > self.HAZARD_TIMEOUT:  # if object does not move, we must bypass
+                    if self.avoidance_method == ADJUST_AVOIDANCE:  # too dangerous, let's bail and go back
+                        pass  # TODO: FIX
+                        # self.update_state(self.track_next_state(path_cut=self.controller.get_mm_completed(), skip=True))
+                    else:  # try the bypass manoeuvre
+                        self.update_state(HAZARD_FORWARDS_BYPASS)
                 elif self.vehicle.has_screen():
-                    if self.elapsed_ms() > self.HAZARD_TIMEOUT*(3/4):
-                        self.screen.print_variable(".", 8, 5)
-                    elif self.elapsed_ms() > self.HAZARD_TIMEOUT*(2/4):
-                        self.screen.print_variable(".", 8, 5)
-                    elif self.elapsed_ms() > self.HAZARD_TIMEOUT*(1/4):
+                    if self.elapsed_ms() > self.HAZARD_TIMEOUT*(6/7):
+                        self.screen.print_variable(".    ", 8, 5)
+                    elif self.elapsed_ms() > self.HAZARD_TIMEOUT*(4/7):
+                        self.screen.print_variable(". .  ", 8, 5)
+                    elif self.elapsed_ms() > self.HAZARD_TIMEOUT*(2/7):
                         self.screen.print_variable(". . .", 8, 5)
 
             # - HAZARDS REACTIONS -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -

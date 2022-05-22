@@ -87,6 +87,9 @@ class MotorController:
 
         return lpolarity*averaged_remainder, rpolarity*averaged_remainder
 
+    def get_mm_completed(self):
+        return (self.mm_left + self.mm_right)/2
+
     def run(self):
         """Calculates the pwm values using a closed feedback loop"""
         self.update_duty()
