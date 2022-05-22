@@ -35,7 +35,7 @@ class MotorController:
         2. Wheel diameter is 65 mm -> 40 clicks = pi*65 mm
         3. The output function"""
     # a = 25, of = 1.2, base = 28, bias = 5
-    def __init__(self, encoder, target_mm_left=0, target_mm_right=0, amplitude=45, offset=1.2, base_duty=30, bias=-1):
+    def __init__(self, encoder, target_mm_left=0, target_mm_right=0, amplitude=45, offset=1.2, base_duty=30, bias=0):
         """Initialise all controller constants, variables, and encoder object."""
         # Initialise encoder
         self.encoder = encoder      # Save the encoder object
@@ -168,13 +168,13 @@ class MotorController:
         l_polarity, r_polarity = 1, 1
 
         if abs(self.prev_error_left - self.error_left) <= 1:
-            # print("Trying to get left unstuck {}: ".format(self.stuck_count_left))
+            print("Trying to get left unstuck {}: ".format(self.stuck_count_left))
             self.stuck_count_left += 1
         else:
             self.stuck_count_left = max(self.stuck_count_left-0.5, 0)
 
         if abs(self.prev_error_right - self.error_right) <= 1:
-            # print("Trying to get right unstuck {}: ".format(self.stuck_count_right))
+            print("Trying to get right unstuck {}: ".format(self.stuck_count_right))
             self.stuck_count_right += 1
         else:
             self.stuck_count_right = max(self.stuck_count_right-0.5, 0)
@@ -204,11 +204,11 @@ class MotorController:
 
         sideways_error = 0
         if self.STRAIGHT_LINE_TRAVEL:
-            sideways_error = 50*(abs(self.error_left) - abs(self.error_right))
+            sideways_error = 1*(abs(self.error_left) - abs(self.error_right))
             sideways_error = clamp(sideways_error, 25, -25)  # clamp to |25|
             # if our error is smaller on the right compared to the left, we want to increase
             # the left motor
-        # print("sideways_error=", sideways_error)
+        print("sideways_error=", sideways_error)
         return int(lduty + lpolarity*self.bias + lpolarity*sideways_error), \
             int(rduty - rpolarity*self.bias - rpolarity*sideways_error)
 
@@ -253,19 +253,19 @@ class MotorController:
         # Check for polarity change in left duty
         if not self.toggle_left_enc:
             if self.duty_left > 0 and not self.encoder.left_dir_is_fwd():
-                # print("Switching encoder polarity l->fwd")
+                print("Switching encoder polarity l->fwd")
                 self.toggle_left_enc = True  # Queue a polarity change to forwards
             elif self.duty_left < 0 and self.encoder.left_dir_is_fwd():
-                # print("Switching encoder polarity l->bkwd")
+                print("Switching encoder polarity l->bkwd")
                 self.toggle_left_enc = True  # Queue a polarity change to backwards
 
         # Check for polarity change in right duty
         if not self.toggle_right_enc:
             if self.duty_right > 0 and not self.encoder.right_dir_is_fwd():
-                # print("Switching encoder polarity r->fwd")
+                print("Switching encoder polarity r->fwd")
                 self.toggle_right_enc = True  # Queue a polarity change to forwards
             elif self.duty_right < 0 and self.encoder.right_dir_is_fwd():
-                # print("Switching encoder polarity r->bkwd")
+                print("Switching encoder polarity r->bkwd")
                 self.toggle_right_enc = True  # Queue a polarity change to backwards
 
         # If a polarity change is requested, do it once the vehicle is stationary
