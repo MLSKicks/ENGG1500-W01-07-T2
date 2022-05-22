@@ -89,7 +89,7 @@ track_states = [
 
     # get to third roundabout
     (ROTATE_RIGHT, 100, -100, ROTATE_PWM, NO_AVOIDANCE),  # rotate 90 degrees right
-    (FORWARDS, 1150*h_sf, 1150*h_sf, STRAIGHT_PWM, ADJUST_AVOIDANCE),  # forwards
+    (FORWARDS, 1200*h_sf, 1200*h_sf, STRAIGHT_PWM, ADJUST_AVOIDANCE),  # forwards
     DEPLOY_SENSOR,
 
     # get to fourth roundabout
