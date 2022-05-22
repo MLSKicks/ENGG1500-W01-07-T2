@@ -41,13 +41,14 @@ CUSTOM = 106
 v_sf = 1  # vertical scale factor
 h_sf = 1  # horizontal scale factor
 
+# 2 roundabouts track
 track_states = [
     # reverse out
-    (UNPARKING, -550*h_sf, -550*h_sf, STRAIGHT_PWM),  # backwards
+    (UNPARKING, -560*h_sf, -560*h_sf, STRAIGHT_PWM),  # backwards
     (ROTATE_RIGHT, 100, -100, ROTATE_PWM),   # rotate right
 
     # get to first roundabout
-    (FORWARDS, 750*v_sf, 750*v_sf, STRAIGHT_PWM),   # forwards
+    (FORWARDS, 740*v_sf, 740*v_sf, STRAIGHT_PWM),   # forwards
     DEPLOY_SENSOR,
 
     # get to second roundabout
@@ -56,14 +57,51 @@ track_states = [
 
     # return home
     (ROTATE_RIGHT, 200, -200, ROTATE_PWM),   # rotate right
-    (FORWARDS, 2430*v_sf, 2430*v_sf, STRAIGHT_PWM),  # forwards
+    (FORWARDS, 2420*v_sf, 2420*v_sf, STRAIGHT_PWM),  # forwards
 
     # reverse in
     (ROTATE_RIGHT, 100, -100, ROTATE_PWM),   # rotate right
-    (PARKING, 550*h_sf, 550*h_sf, STRAIGHT_PWM),  # forwards
+    (PARKING, 560*h_sf, 560*h_sf, STRAIGHT_PWM),  # forwards
     STOP
 ]
 
+# 4 roundabouts track
+extra_track_states = [
+    # reverse out
+    (UNPARKING, -560*h_sf, -560*h_sf, STRAIGHT_PWM),  # backwards
+    (ROTATE_RIGHT, 100, -100, ROTATE_PWM),   # rotate 90 degrees right
+
+    # get to first roundabout
+    (FORWARDS, 740*v_sf, 740*v_sf, STRAIGHT_PWM),   # forwards
+    DEPLOY_SENSOR,
+
+    # get to second roundabout
+    (FORWARDS, 1650*v_sf, 1650*v_sf, STRAIGHT_PWM),  # forwards
+    DEPLOY_SENSOR,
+
+    # get to third roundabout
+    (ROTATE_RIGHT, 100, -100, ROTATE_PWM),  # rotate 90 degrees right
+    (FORWARDS, 1150*h_sf, 1150*h_sf, STRAIGHT_PWM),  # forwards
+    DEPLOY_SENSOR,
+
+    # get to fourth roundabout
+    (ROTATE_RIGHT, 200, -200, ROTATE_PWM),   # rotate 180 degrees right
+    (FORWARDS, 1750*h_sf, 1750*h_sf, STRAIGHT_PWM),  # forwards
+    (ROTATE_LEFT, -100, 100, ROTATE_PWM),  # rotate 90 degrees left
+    (FORWARDS, 550*v_sf, 550*v_sf, STRAIGHT_PWM),
+    DEPLOY_SENSOR,
+
+    # return home
+    (ROTATE_LEFT, -100, 100, ROTATE_PWM),  # rotate 90 degrees left
+    (FORWARDS, 550*h_sf, 550*h_sf, STRAIGHT_PWM),  # forwards
+    (ROTATE_RIGHT, 100, -100, ROTATE_PWM),  # rotate 90 degrees right
+    (FORWARDS, 2000*v_sf, 2000*v_sf, STRAIGHT_PWM),  # forwards
+
+    # reverse in
+    (ROTATE_RIGHT, 100, -100, ROTATE_PWM),   # rotate right
+    (PARKING, 560*h_sf, 560*h_sf, STRAIGHT_PWM),  # forwards
+    STOP
+]
 
 # - - - - - - - - - - - - - - - - - - - - - STATE MACHINE - - - - - - - - - - - - - - - - - - - - - - - #
 class StateMachine:
