@@ -184,13 +184,9 @@ class StateMachine:
                 self.screen.print("State: Stopped\n\nMy job is done!")
             elif self.state == HAZARD_FORWARDS:
                 self.screen.print_art("State: Hazard   \n\n       X       \n       ^       \n       |       \nWaiting")
-            elif self.state == HAZARD_BACKWARDS:
-                self.screen.print_art("State: Hazard   \n\n       |       \n       V       \n       X       \nWaiting")
                 self.screen.print("State: Hazard\n\nAn object is be-\nhind me!\nWaiting:")
             elif self.state == HAZARD_FORWARDS_BYPASS:
                 self.screen.print("State: Bypassing\n\nTrying to dodge\nan object in fr-\nont of me!")
-            elif self.state == HAZARD_BACKWARDS_BYPASS:
-                self.screen.print("State: Bypassing\n\nTrying to dodge\nan object be-\nhind me!")
             elif self.state == FORWARDS:
                 self.screen.print_art("State: Forwards \n\n       ^       \n       |       \n       |       ")
             elif self.state == BACKWARDS:
@@ -262,7 +258,6 @@ class StateMachine:
         while True:
             # - - - - - - - - - - - - - - - - - - - - SENSOR DATA COLLECTION - - - - - - - - - - - - - - - - - - #
             hazard_forwards = self.vehicle.ir_f.is_hazard()
-            hazard_backwards = False
 
             # - - - - - - - - - - - - - - - - - - - - GLOBAL TRANSITIONS - - - - - - - - - - - - - - - - - - - - #
             if hazard_forwards:  # Something is in front so lets stop ...
@@ -273,13 +268,6 @@ class StateMachine:
                     self.custom_target_left, self.custom_target_right = self.controller.get_averaged_remainder_target()
                 elif self.state == PARKING:
                     self.update_state(STOP)
-
-            if hazard_backwards:  # Something is behind us so lets stop ...
-                # only if we are currently travelling backwards
-                if self.state == BACKWARDS or self.state == UNPARKING:
-                    self.hazard_callback_state = self.state
-                    self.update_state(HAZARD_BACKWARDS)
-                    self.custom_target_left, self.custom_target_right = self.controller.get_averaged_remainder_target()
 
             # - - - - - - - - - - - - - - - - - - - - STATE MACHINE HEADER - - - - - - - - - - - - - - - - - - - #
             self.update_state_variables()  # Updates prev_state and is_transition flag
@@ -304,11 +292,11 @@ class StateMachine:
                     self.update_state(self.track_next_state())
                 elif self.vehicle.has_screen():
                     if self.elapsed_ms() > self.DEPLOY_SENSOR_TIMEOUT*(3/4):
-                        self.screen.print_variable(". . .", 5, 4)
+                        self.screen.print_variable(".", 5, 4)
                     elif self.elapsed_ms() > self.DEPLOY_SENSOR_TIMEOUT*(2/4):
                         self.screen.print_variable(". .", 5, 4)
                     elif self.elapsed_ms() > self.DEPLOY_SENSOR_TIMEOUT*(1/4):
-                        self.screen.print_variable(".", 5, 4)
+                        self.screen.print_variable(". . .", 5, 4)
 
             # - PRINT_ROAD_INFO -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
             # Displays what our IR sensors are saying
@@ -345,30 +333,11 @@ class StateMachine:
                     self.update_state(HAZARD_FORWARDS_BYPASS)
                 elif self.vehicle.has_screen():
                     if self.elapsed_ms() > self.HAZARD_TIMEOUT*(3/4):
-                        self.screen.print_variable(". . .", 8, 5)
-                    elif self.elapsed_ms() > self.HAZARD_TIMEOUT*(2/4):
-                        self.screen.print_variable(". .", 8, 5)
-                    elif self.elapsed_ms() > self.HAZARD_TIMEOUT*(1/4):
                         self.screen.print_variable(".", 8, 5)
-
-            # Stop if we encounter a hazard behind us on the road
-            elif self.state == HAZARD_BACKWARDS:
-                if self.is_transition:
-                    self.emergency_brake()
-                    self.controller.set_target(0, 0)
-
-                if not hazard_backwards:  # if object has moved
-                    self.update_state(self.hazard_callback_state)
-
-                if self.elapsed_ms() > self.HAZARD_TIMEOUT:  # if object does not move, we quit
-                    self.update_state(HAZARD_BACKWARDS_BYPASS)
-                elif self.vehicle.has_screen():
-                    if self.elapsed_ms() > self.HAZARD_TIMEOUT*(3/4):
-                        self.screen.print_variable(". . .", 8, 5)
                     elif self.elapsed_ms() > self.HAZARD_TIMEOUT*(2/4):
-                        self.screen.print_variable(". .", 8, 5)
-                    elif self.elapsed_ms() > self.HAZARD_TIMEOUT*(1/4):
                         self.screen.print_variable(".", 8, 5)
+                    elif self.elapsed_ms() > self.HAZARD_TIMEOUT*(1/4):
+                        self.screen.print_variable(". . .", 8, 5)
 
             # - HAZARDS REACTIONS -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
             elif self.state == HAZARD_FORWARDS_BYPASS:
@@ -421,29 +390,6 @@ class StateMachine:
                     else:
                         self.max_speed = SLOW_STRAIGHT_PWM
                         self.update_state(self.hazard_callback_state)
-
-            elif self.state == HAZARD_BACKWARDS_BYPASS:
-                if self.is_transition:  # rotate left
-                    self.max_speed = ROTATE_PWM
-                    self.controller.set_target(-QUARTER_TURN, QUARTER_TURN)
-
-                if self.controller.target_met():
-                    sleep_ms(self.STATE_CHANGE_DELAY)  # (make sure we are stopped after each target)
-                    if self.state_phase == 0:  # travel backwards a little
-                        self.max_speed = STRAIGHT_PWM
-                        self.controller.set_target(-self.HAZARD_BYPASS_MM, -self.HAZARD_BYPASS_MM)
-                        self.state_phase += 1
-
-                    elif self.state_phase == 1:  # rotate right, and ...
-                        self.max_speed = ROTATE_PWM
-                        self.controller.set_target(QUARTER_TURN, -QUARTER_TURN)
-                        self.state_phase += 1
-
-                    elif self.state_phase == 2:  # ... hopefully we are clear!
-                        if hazard_backwards:
-                            self.update_state(HAZARD_BACKWARDS_BYPASS)  # try, try, try again
-                        else:
-                            self.update_state(self.hazard_callback_state)
 
             # - FORWARDS -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
             elif self.state == FORWARDS:
