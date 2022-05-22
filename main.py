@@ -4,22 +4,20 @@ from time import sleep_ms, ticks_ms, ticks_diff
 # TODO: TRACK DISTORTED BY 1.1x ????
 
 # - - - - - - - - - - - - - - - - - - - - - - - RANDOM STUFF - - - - - - - - - - - - - - - - - - - - - - - - - -#
-ascii_cat = ("State: PRINT_ART\n\n    _,,/|\n"
-             "    \\o o'\n"
-             "    =_~_=\n"
-             "    /   \\ (\\\n"
-             "   (////_)//\n"
-             "   ~~~")
+ascii_cat = ("State: SPLASH\n\n\n"
+             "    .-'--`-._\n"
+             "~ ~ '-O---O--'\n\n"
+             " Max Strandberg ")
 
 # max pwm values
-ROTATE_PWM = 55
+ROTATE_PWM = 45
 STRAIGHT_PWM = 55
 SLOW_STRAIGHT_PWM = 45
 SLOW_ROTATE_PWM = 40
 
 # rotations
-QUARTER_TURN = 110
-HALF_TURN = 220
+QUARTER_TURN = 105
+HALF_TURN = 210
 
 # avoidance methods
 NO_AVOIDANCE = 0
@@ -93,20 +91,20 @@ track_states = [
 
     # get to third roundabout
     (ROTATE_RIGHT, QUARTER_TURN, -QUARTER_TURN, ROTATE_PWM, NO_AVOIDANCE),  # rotate 90 degrees right
-    (FORWARDS, 1200*h_sf, 1200*h_sf, STRAIGHT_PWM, ADJUST_AVOIDANCE),  # forwards
+    (FORWARDS, 1150*h_sf, 1150*h_sf, STRAIGHT_PWM, ADJUST_AVOIDANCE),  # forwards
     DEPLOY_SENSOR,
 
     # get to fourth roundabout
-    (BACKWARDS, -1750*h_sf, -1750*h_sf, STRAIGHT_PWM, BYPASS_AVOIDANCE),  # backwards
-    (ROTATE_RIGHT, QUARTER_TURN, -QUARTER_TURN, ROTATE_PWM, NO_AVOIDANCE),  # rotate 90 degrees right
-    (FORWARDS, 480*v_sf, 480*v_sf, SLOW_STRAIGHT_PWM, BYPASS_AVOIDANCE),  # forwards
+    (BACKWARDS, -1700*h_sf, -1700*h_sf, STRAIGHT_PWM, BYPASS_AVOIDANCE),  # backwards
+    (ROTATE_RIGHT, QUARTER_TURN, -QUARTER_TURN, SLOW_ROTATE_PWM, NO_AVOIDANCE),  # rotate 90 degrees right
+    (FORWARDS, 525*v_sf, 525*v_sf, SLOW_STRAIGHT_PWM, BYPASS_AVOIDANCE),  # forwards
     DEPLOY_SENSOR,
 
     # return home
     (ROTATE_LEFT, -QUARTER_TURN, QUARTER_TURN, SLOW_ROTATE_PWM, NO_AVOIDANCE),  # rotate 90 degrees left
-    (FORWARDS, 550*h_sf, 550*h_sf, SLOW_STRAIGHT_PWM, BYPASS_AVOIDANCE),  # forwards
+    (FORWARDS, 500*h_sf, 500*h_sf, SLOW_STRAIGHT_PWM, BYPASS_AVOIDANCE),  # forwards
     (ROTATE_RIGHT, QUARTER_TURN, -QUARTER_TURN, SLOW_ROTATE_PWM, NO_AVOIDANCE),  # rotate 90 degrees right
-    (FORWARDS, 2000*v_sf, 2000*v_sf, STRAIGHT_PWM, BYPASS_AVOIDANCE),  # forwards
+    (FORWARDS, 1700*v_sf, 1700*v_sf, STRAIGHT_PWM, BYPASS_AVOIDANCE),  # forwards
 
     # reverse in
     (ROTATE_RIGHT, QUARTER_TURN, -QUARTER_TURN, ROTATE_PWM, NO_AVOIDANCE),   # rotate right
@@ -185,27 +183,28 @@ class StateMachine:
             elif self.state == STOP:
                 self.screen.print("State: Stopped\n\nMy job is done!")
             elif self.state == HAZARD_FORWARDS:
-                self.screen.print("State: Hazard\n\nAn object is in\nfront of me!\nWaiting:")
+                self.screen.print_art("State: Hazard   \n\n       X       \n       ^       \n       |       \nWaiting")
             elif self.state == HAZARD_BACKWARDS:
+                self.screen.print_art("State: Hazard   \n\n       |       \n       V       \n       X       \nWaiting")
                 self.screen.print("State: Hazard\n\nAn object is be-\nhind me!\nWaiting:")
             elif self.state == HAZARD_FORWARDS_BYPASS:
                 self.screen.print("State: Bypassing\n\nTrying to dodge\nan object in fr-\nont of me!")
             elif self.state == HAZARD_BACKWARDS_BYPASS:
                 self.screen.print("State: Bypassing\n\nTrying to dodge\nan object be-\nhind me!")
             elif self.state == FORWARDS:
-                self.screen.print("State: Travell-\ning Forwards")
+                self.screen.print_art("State: Forwards \n\n       ^       \n       |       \n       |       ")
             elif self.state == BACKWARDS:
-                self.screen.print("State: Travell-\ning Backwards")
+                self.screen.print_art("State: Backwards\n\n       |       \n       |       \n       V       ")
             elif self.state == ROTATE_LEFT:
-                self.screen.print("State: Rotate\nLeft")
+                self.screen.print_art("State: Left     \n\n     <--.       \n     `:         \n           |    ")
             elif self.state == ROTATE_RIGHT:
-                self.screen.print("State: Rotate\nRight")
+                self.screen.print_art("State: Right    \n\n       .-->     \n     :`         \n    |           ")
             elif self.state == CUSTOM:
                 self.screen.print("State: Custom")
             elif self.state == PARKING:
-                self.screen.print("State: Parking")
+                self.screen.print_art("State: Parking  \n\n       ^       \n       |       \n       |       ")
             elif self.state == UNPARKING:
-                self.screen.print("State: Unparking")
+                self.screen.print_art("State: Unparking\n\n       |       \n       |       \n       V       ")
             else:
                 self.screen.print("State: Not Found")
 
@@ -215,6 +214,7 @@ class StateMachine:
 
     def track_next_state(self):
         """Gets the next state in the queue"""
+        self.vehicle.set_motor(0, 0)  # make us stop, so that we're not rolling and trick the pid control
         next_state = track_states[self.track_counter]
 
         if type(next_state) is tuple:
@@ -239,7 +239,9 @@ class StateMachine:
 
     def veer_left(self):
         self.vehicle.set_motor(-45, 45)
-        sleep_ms(50)
+        sleep_ms(70)
+        self.vehicle.set_motor(40, -40)
+        sleep_ms(25)
         self.vehicle.set_motor(0, 0)
 
     # - - - - - - - - - - - - - - - - - - - - - - MAIN STATE MACHINE - - - - - - - - - - - - - - - - - - - - - - - #
@@ -343,11 +345,11 @@ class StateMachine:
                     self.update_state(HAZARD_FORWARDS_BYPASS)
                 elif self.vehicle.has_screen():
                     if self.elapsed_ms() > self.HAZARD_TIMEOUT*(3/4):
-                        self.screen.print_variable(". . .", 5, 5)
+                        self.screen.print_variable(". . .", 8, 5)
                     elif self.elapsed_ms() > self.HAZARD_TIMEOUT*(2/4):
-                        self.screen.print_variable(". .", 5, 5)
+                        self.screen.print_variable(". .", 8, 5)
                     elif self.elapsed_ms() > self.HAZARD_TIMEOUT*(1/4):
-                        self.screen.print_variable(".", 5, 5)
+                        self.screen.print_variable(".", 8, 5)
 
             # Stop if we encounter a hazard behind us on the road
             elif self.state == HAZARD_BACKWARDS:
@@ -362,11 +364,11 @@ class StateMachine:
                     self.update_state(HAZARD_BACKWARDS_BYPASS)
                 elif self.vehicle.has_screen():
                     if self.elapsed_ms() > self.HAZARD_TIMEOUT*(3/4):
-                        self.screen.print_variable(". . .", 5, 5)
+                        self.screen.print_variable(". . .", 8, 5)
                     elif self.elapsed_ms() > self.HAZARD_TIMEOUT*(2/4):
-                        self.screen.print_variable(". .", 5, 5)
+                        self.screen.print_variable(". .", 8, 5)
                     elif self.elapsed_ms() > self.HAZARD_TIMEOUT*(1/4):
-                        self.screen.print_variable(".", 5, 5)
+                        self.screen.print_variable(".", 8, 5)
 
             # - HAZARDS REACTIONS -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
             elif self.state == HAZARD_FORWARDS_BYPASS:
