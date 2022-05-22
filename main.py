@@ -17,6 +17,10 @@ STRAIGHT_PWM = 55
 SLOW_STRAIGHT_PWM = 45
 SLOW_ROTATE_PWM = 40
 
+# rotations
+QUARTER_TURN = 110
+HALF_TURN = 220
+
 # avoidance methods
 NO_AVOIDANCE = 0
 BYPASS_AVOIDANCE = 1
@@ -53,7 +57,7 @@ h_sf = 1  # horizontal scale factor
 extra_track_states = [
     # reverse out
     (UNPARKING, -560*h_sf, -560*h_sf, STRAIGHT_PWM, NO_AVOIDANCE),  # backwards
-    (ROTATE_RIGHT, 100, -100, ROTATE_PWM, NO_AVOIDANCE),   # rotate right
+    (ROTATE_RIGHT, QUARTER_TURN, -QUARTER_TURN, ROTATE_PWM, NO_AVOIDANCE),   # rotate right
 
     # get to first roundabout
     (FORWARDS, 600*v_sf, 600*v_sf, STRAIGHT_PWM, BYPASS_AVOIDANCE),   # forwards
@@ -64,11 +68,11 @@ extra_track_states = [
     DEPLOY_SENSOR,
 
     # return home
-    (ROTATE_RIGHT, 200, -200, ROTATE_PWM, NO_AVOIDANCE),   # rotate right
+    (ROTATE_RIGHT, HALF_TURN, -HALF_TURN, ROTATE_PWM, NO_AVOIDANCE),   # rotate right
     (FORWARDS, 2300*v_sf, 2300*v_sf, STRAIGHT_PWM, BYPASS_AVOIDANCE),  # forwards
 
     # reverse in
-    (ROTATE_RIGHT, 100, -100, ROTATE_PWM, NO_AVOIDANCE),   # rotate right
+    (ROTATE_RIGHT, QUARTER_TURN, -QUARTER_TURN, ROTATE_PWM, NO_AVOIDANCE),   # rotate right
     (PARKING, 560*h_sf, 560*h_sf, STRAIGHT_PWM, NO_AVOIDANCE),  # forwards
     STOP
 ]
@@ -77,7 +81,7 @@ extra_track_states = [
 track_states = [
     # reverse out
     (UNPARKING, -560*h_sf, -560*h_sf, STRAIGHT_PWM, NO_AVOIDANCE),  # backwards
-    (ROTATE_RIGHT, 100, -100, ROTATE_PWM, NO_AVOIDANCE),   # rotate 90 degrees right
+    (ROTATE_RIGHT, QUARTER_TURN, -QUARTER_TURN, ROTATE_PWM, NO_AVOIDANCE),   # rotate 90 degrees right
 
     # get to first roundabout
     (FORWARDS, 600*v_sf, 600*v_sf, STRAIGHT_PWM, BYPASS_AVOIDANCE),   # forwards
@@ -88,24 +92,24 @@ track_states = [
     DEPLOY_SENSOR,
 
     # get to third roundabout
-    (ROTATE_RIGHT, 100, -100, ROTATE_PWM, NO_AVOIDANCE),  # rotate 90 degrees right
+    (ROTATE_RIGHT, QUARTER_TURN, -QUARTER_TURN, ROTATE_PWM, NO_AVOIDANCE),  # rotate 90 degrees right
     (FORWARDS, 1200*h_sf, 1200*h_sf, STRAIGHT_PWM, ADJUST_AVOIDANCE),  # forwards
     DEPLOY_SENSOR,
 
     # get to fourth roundabout
     (BACKWARDS, -1750*h_sf, -1750*h_sf, STRAIGHT_PWM, BYPASS_AVOIDANCE),  # backwards
-    (ROTATE_RIGHT, 100, -100, ROTATE_PWM, NO_AVOIDANCE),  # rotate 90 degrees right
+    (ROTATE_RIGHT, QUARTER_TURN, -QUARTER_TURN, ROTATE_PWM, NO_AVOIDANCE),  # rotate 90 degrees right
     (FORWARDS, 480*v_sf, 480*v_sf, SLOW_STRAIGHT_PWM, BYPASS_AVOIDANCE),  # forwards
     DEPLOY_SENSOR,
 
     # return home
-    (ROTATE_LEFT, -105, 105, SLOW_ROTATE_PWM, NO_AVOIDANCE),  # rotate 90 degrees left
+    (ROTATE_LEFT, -QUARTER_TURN, QUARTER_TURN, SLOW_ROTATE_PWM, NO_AVOIDANCE),  # rotate 90 degrees left
     (FORWARDS, 550*h_sf, 550*h_sf, SLOW_STRAIGHT_PWM, BYPASS_AVOIDANCE),  # forwards
-    (ROTATE_RIGHT, 105, -105, SLOW_ROTATE_PWM, NO_AVOIDANCE),  # rotate 90 degrees right
+    (ROTATE_RIGHT, QUARTER_TURN, -QUARTER_TURN, SLOW_ROTATE_PWM, NO_AVOIDANCE),  # rotate 90 degrees right
     (FORWARDS, 2000*v_sf, 2000*v_sf, STRAIGHT_PWM, BYPASS_AVOIDANCE),  # forwards
 
     # reverse in
-    (ROTATE_RIGHT, 100, -100, ROTATE_PWM, NO_AVOIDANCE),   # rotate right
+    (ROTATE_RIGHT, QUARTER_TURN, -QUARTER_TURN, ROTATE_PWM, NO_AVOIDANCE),   # rotate right
     (PARKING, 560*h_sf, 560*h_sf, STRAIGHT_PWM, NO_AVOIDANCE),  # forwards
     STOP
 ]
@@ -374,7 +378,7 @@ class StateMachine:
                     sleep_ms(self.STATE_CHANGE_DELAY)  # (make sure we are stopped after each target)
                     if self.state_phase == 0:  # rotate left
                         self.max_speed = SLOW_ROTATE_PWM
-                        self.controller.set_target(-100, 100)
+                        self.controller.set_target(-QUARTER_TURN, QUARTER_TURN)
                         self.state_phase += 1
 
                     elif self.state_phase == 1:  # travel forwards a little
@@ -384,7 +388,7 @@ class StateMachine:
 
                     elif self.state_phase == 2:  # rotate right, and ...
                         self.max_speed = SLOW_ROTATE_PWM
-                        self.controller.set_target(100, -100)
+                        self.controller.set_target(QUARTER_TURN, -QUARTER_TURN)
                         self.state_phase += 1
 
                     elif self.state_phase == 3:  # ... hopefully we are clear!
@@ -399,7 +403,7 @@ class StateMachine:
 
                     elif self.state_phase == 4:  # rotate right
                         self.max_speed = SLOW_ROTATE_PWM
-                        self.controller.set_target(100, -100)
+                        self.controller.set_target(QUARTER_TURN, -QUARTER_TURN)
                         self.state_phase += 1
 
                     elif self.state_phase == 5:  # undo the bypass travel we did
@@ -409,7 +413,7 @@ class StateMachine:
 
                     elif self.state_phase == 6:  # rotate left to get back on track
                         self.max_speed = SLOW_ROTATE_PWM
-                        self.controller.set_target(-100, 100)
+                        self.controller.set_target(-QUARTER_TURN, QUARTER_TURN)
                         self.state_phase += 1
 
                     else:
@@ -419,7 +423,7 @@ class StateMachine:
             elif self.state == HAZARD_BACKWARDS_BYPASS:
                 if self.is_transition:  # rotate left
                     self.max_speed = ROTATE_PWM
-                    self.controller.set_target(-100, 100)
+                    self.controller.set_target(-QUARTER_TURN, QUARTER_TURN)
 
                 if self.controller.target_met():
                     sleep_ms(self.STATE_CHANGE_DELAY)  # (make sure we are stopped after each target)
@@ -430,7 +434,7 @@ class StateMachine:
 
                     elif self.state_phase == 1:  # rotate right, and ...
                         self.max_speed = ROTATE_PWM
-                        self.controller.set_target(100, -100)
+                        self.controller.set_target(QUARTER_TURN, -QUARTER_TURN)
                         self.state_phase += 1
 
                     elif self.state_phase == 2:  # ... hopefully we are clear!
