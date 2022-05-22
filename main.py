@@ -18,6 +18,7 @@ SLOW_STRAIGHT_PWM = 45
 SLOW_ROTATE_PWM = 40
 
 # avoidance methods
+NO_AVOIDANCE = 0
 BYPASS_AVOIDANCE = 1
 ADJUST_AVOIDANCE = 2
 
@@ -51,61 +52,61 @@ h_sf = 1  # horizontal scale factor
 # 2 roundabouts track
 extra_track_states = [
     # reverse out
-    (UNPARKING, -560*h_sf, -560*h_sf, STRAIGHT_PWM),  # backwards
-    (ROTATE_RIGHT, 100, -100, ROTATE_PWM),   # rotate right
+    (UNPARKING, -560*h_sf, -560*h_sf, STRAIGHT_PWM, NO_AVOIDANCE),  # backwards
+    (ROTATE_RIGHT, 100, -100, ROTATE_PWM, NO_AVOIDANCE),   # rotate right
 
     # get to first roundabout
-    (FORWARDS, 600*v_sf, 600*v_sf, STRAIGHT_PWM),   # forwards
+    (FORWARDS, 600*v_sf, 600*v_sf, STRAIGHT_PWM, BYPASS_AVOIDANCE),   # forwards
     DEPLOY_SENSOR,
 
     # get to second roundabout
-    (FORWARDS, 1650*v_sf, 1650*v_sf, STRAIGHT_PWM),  # forwards
+    (FORWARDS, 1650*v_sf, 1650*v_sf, STRAIGHT_PWM, BYPASS_AVOIDANCE),  # forwards
     DEPLOY_SENSOR,
 
     # return home
-    (ROTATE_RIGHT, 200, -200, ROTATE_PWM),   # rotate right
-    (FORWARDS, 2300*v_sf, 2300*v_sf, STRAIGHT_PWM),  # forwards
+    (ROTATE_RIGHT, 200, -200, ROTATE_PWM, NO_AVOIDANCE),   # rotate right
+    (FORWARDS, 2300*v_sf, 2300*v_sf, STRAIGHT_PWM, BYPASS_AVOIDANCE),  # forwards
 
     # reverse in
-    (ROTATE_RIGHT, 100, -100, ROTATE_PWM),   # rotate right
-    (PARKING, 560*h_sf, 560*h_sf, STRAIGHT_PWM),  # forwards
+    (ROTATE_RIGHT, 100, -100, ROTATE_PWM, NO_AVOIDANCE),   # rotate right
+    (PARKING, 560*h_sf, 560*h_sf, STRAIGHT_PWM, NO_AVOIDANCE),  # forwards
     STOP
 ]
 
 # 4 roundabouts track
 track_states = [
     # reverse out
-    (UNPARKING, -560*h_sf, -560*h_sf, STRAIGHT_PWM),  # backwards
-    (ROTATE_RIGHT, 100, -100, ROTATE_PWM),   # rotate 90 degrees right
+    (UNPARKING, -560*h_sf, -560*h_sf, STRAIGHT_PWM, NO_AVOIDANCE),  # backwards
+    (ROTATE_RIGHT, 100, -100, ROTATE_PWM, NO_AVOIDANCE),   # rotate 90 degrees right
 
     # get to first roundabout
-    (FORWARDS, 600*v_sf, 600*v_sf, STRAIGHT_PWM),   # forwards
+    (FORWARDS, 600*v_sf, 600*v_sf, STRAIGHT_PWM, BYPASS_AVOIDANCE),   # forwards
     DEPLOY_SENSOR,
 
     # get to second roundabout
-    (FORWARDS, 1650*v_sf, 1650*v_sf, STRAIGHT_PWM),  # forwards
+    (FORWARDS, 1650*v_sf, 1650*v_sf, STRAIGHT_PWM, BYPASS_AVOIDANCE),  # forwards
     DEPLOY_SENSOR,
 
     # get to third roundabout
-    (ROTATE_RIGHT, 100, -100, ROTATE_PWM),  # rotate 90 degrees right
-    (FORWARDS, 1150*h_sf, 1150*h_sf, STRAIGHT_PWM),  # forwards
+    (ROTATE_RIGHT, 100, -100, ROTATE_PWM, NO_AVOIDANCE),  # rotate 90 degrees right
+    (FORWARDS, 1150*h_sf, 1150*h_sf, STRAIGHT_PWM, ADJUST_AVOIDANCE),  # forwards
     DEPLOY_SENSOR,
 
     # get to fourth roundabout
-    (BACKWARDS, -1750*h_sf, -1750*h_sf, STRAIGHT_PWM),  # backwards
-    (ROTATE_RIGHT, 100, -100, ROTATE_PWM),  # rotate 90 degrees right
-    (FORWARDS, 550*v_sf, 550*v_sf, STRAIGHT_PWM),  # forwards
+    (BACKWARDS, -1750*h_sf, -1750*h_sf, STRAIGHT_PWM, BYPASS_AVOIDANCE),  # backwards
+    (ROTATE_RIGHT, 100, -100, ROTATE_PWM, NO_AVOIDANCE),  # rotate 90 degrees right
+    (FORWARDS, 550*v_sf, 550*v_sf, STRAIGHT_PWM, BYPASS_AVOIDANCE),  # forwards
     DEPLOY_SENSOR,
 
     # return home
-    (ROTATE_LEFT, -100, 100, ROTATE_PWM),  # rotate 90 degrees left
-    (FORWARDS, 550*h_sf, 550*h_sf, STRAIGHT_PWM),  # forwards
-    (ROTATE_RIGHT, 100, -100, ROTATE_PWM),  # rotate 90 degrees right
-    (FORWARDS, 2000*v_sf, 2000*v_sf, STRAIGHT_PWM),  # forwards
+    (ROTATE_LEFT, -100, 100, ROTATE_PWM, NO_AVOIDANCE),  # rotate 90 degrees left
+    (FORWARDS, 550*h_sf, 550*h_sf, STRAIGHT_PWM, BYPASS_AVOIDANCE),  # forwards
+    (ROTATE_RIGHT, 100, -100, ROTATE_PWM, NO_AVOIDANCE),  # rotate 90 degrees right
+    (FORWARDS, 2000*v_sf, 2000*v_sf, STRAIGHT_PWM, BYPASS_AVOIDANCE),  # forwards
 
     # reverse in
-    (ROTATE_RIGHT, 100, -100, ROTATE_PWM),   # rotate right
-    (PARKING, 560*h_sf, 560*h_sf, STRAIGHT_PWM),  # forwards
+    (ROTATE_RIGHT, 100, -100, ROTATE_PWM, NO_AVOIDANCE),   # rotate right
+    (PARKING, 560*h_sf, 560*h_sf, STRAIGHT_PWM, NO_AVOIDANCE),  # forwards
     STOP
 ]
 
@@ -117,6 +118,7 @@ class StateMachine:
         self.prev_state = NULL  # Previous state
         self.state = initial_state  # Current state
         self.state_phase = 0
+        self.avoidance_method = NO_AVOIDANCE
         self.is_transition = True  # Transition flag telling us if we just switched states
         self.update_is_transition = False  # Flag tells us to update is_transition to false
         self.t0 = ticks_ms()  # For calculating time spent in a state
@@ -125,9 +127,9 @@ class StateMachine:
         self.track_counter = 0
         self.custom_target_left, self.custom_target_right = 0, 0
         self.max_speed = 65
-        self.HAZARD_TIMEOUT = 5000  # ms
-        self.DEPLOY_SENSOR_TIMEOUT = 1000  # ms
-        self.SPLASH_SCREEN_TIMEOUT = 1000  # ms
+        self.HAZARD_TIMEOUT = 4000  # ms
+        self.DEPLOY_SENSOR_TIMEOUT = 600  # ms
+        self.SPLASH_SCREEN_TIMEOUT = 600  # ms
         self.STATE_CHANGE_DELAY = 1000  # ms
         self.HAZARD_RUNBACK_MM = 20  # mm
         self.HAZARD_BYPASS_MM = 250  # mm to travel around an obstacle
@@ -136,7 +138,8 @@ class StateMachine:
         # Other initialisation
         self.vehicle = Vehicle(motor=True, enc=True, screen=True, ir_f=True, ir_b=False)
         self.controller = self.vehicle.controller  # motor control object can set duties to achieve desired targets
-        self.screen = self.vehicle.screen  # Get OLED screen object -> can print useful information
+        if self.vehicle.has_screen():
+            self.screen = self.vehicle.screen  # Get OLED screen object -> can print useful information
 
     def update_state(self, new_state, is_transition=True):
         """Update our current state"""
@@ -165,7 +168,8 @@ class StateMachine:
 
     def print_state(self):
         """Print out what state we are in"""
-        if self.is_transition:  # Run this ONCE when we have just entered a new state -> avoids flickering
+        # Run this ONCE when we have just entered a new state -> avoids flickering
+        if self.is_transition and self.vehicle.has_screen():
             if self.state == NULL:
                 self.screen.print("State: NULL\n\nNo initial state\nwas specified!")
             elif self.state == SPLASH_SCREEN:
@@ -213,6 +217,7 @@ class StateMachine:
             self.custom_target_left = next_state[1]
             self.custom_target_right = next_state[2]
             self.max_speed = next_state[3]
+            self.avoidance_method = next_state[4]
             next_state = next_state[0]
 
         self.track_counter += 1
@@ -226,6 +231,11 @@ class StateMachine:
         if self.state == HAZARD_BACKWARDS:
             self.vehicle.set_motor(75, 75)
             sleep_ms(100)
+        self.vehicle.set_motor(0, 0)
+
+    def veer_left(self):
+        self.vehicle.set_motor(-45, 45)
+        sleep_ms(100)
         self.vehicle.set_motor(0, 0)
 
     # - - - - - - - - - - - - - - - - - - - - - - MAIN STATE MACHINE - - - - - - - - - - - - - - - - - - - - - - - #
@@ -283,14 +293,16 @@ class StateMachine:
             elif self.state == DEPLOY_SENSOR:
                 if self.is_transition:
                     self.controller.set_target(0, 0)
-                if self.elapsed_ms() > self.DEPLOY_SENSOR_TIMEOUT:  # wait until sensors are deployed
+                # wait until sensors are deployed
+                if self.elapsed_ms() > self.DEPLOY_SENSOR_TIMEOUT:
                     self.update_state(self.track_next_state())
-                elif self.elapsed_ms() > self.DEPLOY_SENSOR_TIMEOUT*(3/4):
-                    self.screen.print_variable(". . .", 5, 4)
-                elif self.elapsed_ms() > self.DEPLOY_SENSOR_TIMEOUT*(2/4):
-                    self.screen.print_variable(". .", 5, 4)
-                elif self.elapsed_ms() > self.DEPLOY_SENSOR_TIMEOUT*(1/4):
-                    self.screen.print_variable(".", 5, 4)
+                elif self.vehicle.has_screen():
+                    if self.elapsed_ms() > self.DEPLOY_SENSOR_TIMEOUT*(3/4):
+                        self.screen.print_variable(". . .", 5, 4)
+                    elif self.elapsed_ms() > self.DEPLOY_SENSOR_TIMEOUT*(2/4):
+                        self.screen.print_variable(". .", 5, 4)
+                    elif self.elapsed_ms() > self.DEPLOY_SENSOR_TIMEOUT*(1/4):
+                        self.screen.print_variable(".", 5, 4)
 
             # - PRINT_ROAD_INFO -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
             # Displays what our IR sensors are saying
@@ -298,7 +310,8 @@ class StateMachine:
                 if self.is_transition:
                     self.controller.set_target(0, 0)
 
-                self.screen.print_variable("IR_F Hazard{!s:>5}".format(hazard_forwards), 0, 2)
+                if self.vehicle.has_screen():
+                    self.screen.print_variable("IR_F Hazard{!s:>5}".format(hazard_forwards), 0, 2)
 
                 if self.elapsed_ms() > 1000:
                     pass
@@ -313,20 +326,24 @@ class StateMachine:
             # Stop if we encounter a hazard in front of us on the road
             elif self.state == HAZARD_FORWARDS:
                 if self.is_transition:
-                    self.emergency_brake()
-                    self.controller.set_target(0, 0)
+                    if self.avoidance_method == ADJUST_AVOIDANCE:
+                        self.veer_left()
+                    else:
+                        self.emergency_brake()
+                self.controller.set_target(0, 0)
 
                 if not hazard_forwards:  # if object has moved
                     self.update_state(self.hazard_callback_state)
 
                 if self.elapsed_ms() > self.HAZARD_TIMEOUT:  # if object does not move, we quit
                     self.update_state(HAZARD_FORWARDS_BYPASS)
-                elif self.elapsed_ms() > self.HAZARD_TIMEOUT*(3/4):
-                    self.screen.print_variable(". . .", 5, 5)
-                elif self.elapsed_ms() > self.HAZARD_TIMEOUT*(2/4):
-                    self.screen.print_variable(". .", 5, 5)
-                elif self.elapsed_ms() > self.HAZARD_TIMEOUT*(1/4):
-                    self.screen.print_variable(".", 5, 5)
+                elif self.vehicle.has_screen():
+                    if self.elapsed_ms() > self.HAZARD_TIMEOUT*(3/4):
+                        self.screen.print_variable(". . .", 5, 5)
+                    elif self.elapsed_ms() > self.HAZARD_TIMEOUT*(2/4):
+                        self.screen.print_variable(". .", 5, 5)
+                    elif self.elapsed_ms() > self.HAZARD_TIMEOUT*(1/4):
+                        self.screen.print_variable(".", 5, 5)
 
             # Stop if we encounter a hazard behind us on the road
             elif self.state == HAZARD_BACKWARDS:
@@ -339,12 +356,13 @@ class StateMachine:
 
                 if self.elapsed_ms() > self.HAZARD_TIMEOUT:  # if object does not move, we quit
                     self.update_state(HAZARD_BACKWARDS_BYPASS)
-                elif self.elapsed_ms() > self.HAZARD_TIMEOUT*(3/4):
-                    self.screen.print_variable(". . .", 5, 5)
-                elif self.elapsed_ms() > self.HAZARD_TIMEOUT*(2/4):
-                    self.screen.print_variable(". .", 5, 5)
-                elif self.elapsed_ms() > self.HAZARD_TIMEOUT*(1/4):
-                    self.screen.print_variable(".", 5, 5)
+                elif self.vehicle.has_screen():
+                    if self.elapsed_ms() > self.HAZARD_TIMEOUT*(3/4):
+                        self.screen.print_variable(". . .", 5, 5)
+                    elif self.elapsed_ms() > self.HAZARD_TIMEOUT*(2/4):
+                        self.screen.print_variable(". .", 5, 5)
+                    elif self.elapsed_ms() > self.HAZARD_TIMEOUT*(1/4):
+                        self.screen.print_variable(".", 5, 5)
 
             # - HAZARDS REACTIONS -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
             elif self.state == HAZARD_FORWARDS_BYPASS:

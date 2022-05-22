@@ -39,7 +39,10 @@ class Vehicle:
         # Initialise i2c devices
         if self.init_screen:
             self.i2c_bus = I2C(0, sda=Pin(12), scl=Pin(13))
-            self.screen = Screen(self.i2c_bus)
+            if len(self.i2c_bus.scan()) == 0:
+                self.init_screen = False
+            else:
+                self.screen = Screen(self.i2c_bus)
 
         # Initialise sensors
         if self.init_ir_f:
@@ -51,6 +54,9 @@ class Vehicle:
             self.controller = MotorController(self.encoder)
 
     # - - - - - - - - - - - - - - - - - - - - GENERAL FUNCTIONS - - - - - - - - - - - - - - - - - - - - #
+    def has_screen(self):
+        return self.init_screen
+
     def set_motor(self, lduty, rduty):
         """Set motor duties. This function safely clamps the duties to values between -100 to 100
             :type: lduty: int
