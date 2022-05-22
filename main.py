@@ -11,8 +11,13 @@ ascii_cat = ("State: PRINT_ART\n\n    _,,/|\n"
              "   (////_)//\n"
              "   ~~~")
 
+# max pwm values
 ROTATE_PWM = 50
 STRAIGHT_PWM = 45
+
+# avoidance methods
+BYPASS_AVOIDANCE = 1
+ADJUST_AVOIDANCE = 2
 
 # - - - - - - - - - - - - - - - - - - - - - - - STATE ENUMERATION - - - - - - - - - - - - - - - - - - - - - - - #
 NULL = -1
@@ -48,7 +53,7 @@ track_states = [
     (ROTATE_RIGHT, 100, -100, ROTATE_PWM),   # rotate right
 
     # get to first roundabout
-    (FORWARDS, 740*v_sf, 740*v_sf, STRAIGHT_PWM),   # forwards
+    (FORWARDS, 600*v_sf, 600*v_sf, STRAIGHT_PWM),   # forwards
     DEPLOY_SENSOR,
 
     # get to second roundabout
@@ -57,7 +62,7 @@ track_states = [
 
     # return home
     (ROTATE_RIGHT, 200, -200, ROTATE_PWM),   # rotate right
-    (FORWARDS, 2420*v_sf, 2420*v_sf, STRAIGHT_PWM),  # forwards
+    (FORWARDS, 2280*v_sf, 2280*v_sf, STRAIGHT_PWM),  # forwards
 
     # reverse in
     (ROTATE_RIGHT, 100, -100, ROTATE_PWM),   # rotate right
@@ -124,6 +129,8 @@ class StateMachine:
         self.SPLASH_SCREEN_TIMEOUT = 1000  # ms
         self.STATE_CHANGE_DELAY = 1000  # ms
         self.HAZARD_RUNBACK_MM = 20  # mm
+        self.HAZARD_BYPASS_MM = 250  # mm to travel around an obstacle
+        self.HAZARD_CLEARANCE_MM = 300  # mm to travel forwards
 
         # Other initialisation
         self.vehicle = Vehicle(motor=True, enc=True, screen=True, ir_f=True, ir_b=False)
@@ -329,27 +336,53 @@ class StateMachine:
 
             # - HAZARDS REACTIONS -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
             elif self.state == HAZARD_FORWARDS_BYPASS:
-                if self.is_transition:  # rotate left
-                    self.max_speed = ROTATE_PWM
-                    self.controller.set_target(-100, 100)
+                if self.is_transition:
+                    self.controller.set_target(0, 0)
 
                 if self.controller.target_met():
                     sleep_ms(self.STATE_CHANGE_DELAY)  # (make sure we are stopped after each target)
-                    if self.state_phase == 0:  # travel forwards a little
+                    if self.state_phase == 0:  # rotate left
+                        self.max_speed = ROTATE_PWM
+                        self.controller.set_target(-100, 100)
+
+                    elif self.state_phase == 1:  # travel forwards a little
                         self.max_speed = STRAIGHT_PWM
-                        self.controller.set_target(100, 100)
+                        self.controller.set_target(self.HAZARD_BYPASS_MM, self.HAZARD_BYPASS_MM)
                         self.state_phase += 1
 
-                    elif self.state_phase == 1:  # rotate right, and ...
+                    elif self.state_phase == 2:  # rotate right, and ...
                         self.max_speed = ROTATE_PWM
                         self.controller.set_target(100, -100)
                         self.state_phase += 1
 
-                    elif self.state_phase == 2:  # ... hopefully we are clear!
+                    elif self.state_phase == 3:  # ... hopefully we are clear!
                         if hazard_forwards:
                             self.update_state(HAZARD_FORWARDS_BYPASS)  # try, try, try again
                         else:
+                            self.max_speed = STRAIGHT_PWM
+                            self.controller.set_target(self.HAZARD_CLEARANCE_MM, self.HAZARD_CLEARANCE_MM)
+                            self.custom_target_left -= self.HAZARD_BYPASS_MM
+                            self.custom_target_right -= self.HAZARD_BYPASS_MM
                             self.update_state(self.hazard_callback_state)
+                            self.state_phase += 1
+
+                    elif self.state_phase == 4:  # rotate right
+                        self.max_speed = ROTATE_PWM
+                        self.controller.set_target(100, -100)
+                        self.state_phase += 1
+
+                    elif self.state_phase == 5:  # undo the bypass travel we did
+                        self.max_speed = STRAIGHT_PWM
+                        self.controller.set_target(self.HAZARD_BYPASS_MM, self.HAZARD_BYPASS_MM)  # TODO: CORRECT AMOUNT
+                        self.state_phase += 1
+
+                    elif self.state_phase == 6:  # rotate left to get back on track
+                        self.max_speed = ROTATE_PWM
+                        self.controller.set_target(-100, 100)
+                        self.state_phase += 1
+
+                    else:
+                        self.update_state(self.hazard_callback_state)
 
             elif self.state == HAZARD_BACKWARDS_BYPASS:
                 if self.is_transition:  # rotate left
@@ -360,7 +393,7 @@ class StateMachine:
                     sleep_ms(self.STATE_CHANGE_DELAY)  # (make sure we are stopped after each target)
                     if self.state_phase == 0:  # travel backwards a little
                         self.max_speed = STRAIGHT_PWM
-                        self.controller.set_target(-100, -100)
+                        self.controller.set_target(-self.HAZARD_BYPASS_MM, -self.HAZARD_BYPASS_MM)
                         self.state_phase += 1
 
                     elif self.state_phase == 1:  # rotate right, and ...

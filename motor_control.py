@@ -35,7 +35,7 @@ class MotorController:
         2. Wheel diameter is 65 mm -> 40 clicks = pi*65 mm
         3. The output function"""
     # a = 25, of = 1.2, base = 28, bias = 5
-    def __init__(self, encoder, target_mm_left=0, target_mm_right=0, amplitude=45, offset=1.2, base_duty=30, bias=0):
+    def __init__(self, encoder, target_mm_left=0, target_mm_right=0, amplitude=45, offset=1.2, base_duty=30, bias=-1):
         """Initialise all controller constants, variables, and encoder object."""
         # Initialise encoder
         self.encoder = encoder      # Save the encoder object
