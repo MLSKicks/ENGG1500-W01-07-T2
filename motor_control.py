@@ -117,6 +117,11 @@ class MotorController:
             target_met = False
         if not (-self.target_tolerance <= self.error_right <= self.target_tolerance):
             target_met = False
+        # bonus check for better precision?
+        # if not (-self.target_tolerance <= self.prev_error_left <= self.target_tolerance):
+        #     target_met = False
+        # if not (-self.target_tolerance <= self.prev_error_right <= self.target_tolerance):
+        #     target_met = False
         return target_met
 
     def get_duties(self):
@@ -204,8 +209,8 @@ class MotorController:
 
         sideways_error = 0
         if self.STRAIGHT_LINE_TRAVEL:
-            sideways_error = 5*(abs(self.error_left) - abs(self.error_right))
-            sideways_error = clamp(sideways_error, 25, -25)  # clamp to |25|
+            sideways_error = 10*(abs(self.error_left) - abs(self.error_right))
+            sideways_error = clamp(sideways_error, 27, -27)  # clamp to |27|
             # if our error is smaller on the right compared to the left, we want to increase
             # the left motor
         print("sideways_error=", sideways_error)

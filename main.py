@@ -95,13 +95,13 @@ track_states = [
     # get to fourth roundabout
     (BACKWARDS, -1750*h_sf, -1750*h_sf, STRAIGHT_PWM, BYPASS_AVOIDANCE),  # backwards
     (ROTATE_RIGHT, 100, -100, ROTATE_PWM, NO_AVOIDANCE),  # rotate 90 degrees right
-    (FORWARDS, 550*v_sf, 550*v_sf, STRAIGHT_PWM, BYPASS_AVOIDANCE),  # forwards
+    (FORWARDS, 480*v_sf, 480*v_sf, SLOW_STRAIGHT_PWM, BYPASS_AVOIDANCE),  # forwards
     DEPLOY_SENSOR,
 
     # return home
-    (ROTATE_LEFT, -100, 100, ROTATE_PWM, NO_AVOIDANCE),  # rotate 90 degrees left
-    (FORWARDS, 550*h_sf, 550*h_sf, STRAIGHT_PWM, BYPASS_AVOIDANCE),  # forwards
-    (ROTATE_RIGHT, 100, -100, ROTATE_PWM, NO_AVOIDANCE),  # rotate 90 degrees right
+    (ROTATE_LEFT, -105, 105, SLOW_ROTATE_PWM, NO_AVOIDANCE),  # rotate 90 degrees left
+    (FORWARDS, 550*h_sf, 550*h_sf, SLOW_STRAIGHT_PWM, BYPASS_AVOIDANCE),  # forwards
+    (ROTATE_RIGHT, 105, -105, SLOW_ROTATE_PWM, NO_AVOIDANCE),  # rotate 90 degrees right
     (FORWARDS, 2000*v_sf, 2000*v_sf, STRAIGHT_PWM, BYPASS_AVOIDANCE),  # forwards
 
     # reverse in
@@ -235,7 +235,7 @@ class StateMachine:
 
     def veer_left(self):
         self.vehicle.set_motor(-45, 45)
-        sleep_ms(100)
+        sleep_ms(50)
         self.vehicle.set_motor(0, 0)
 
     # - - - - - - - - - - - - - - - - - - - - - - MAIN STATE MACHINE - - - - - - - - - - - - - - - - - - - - - - - #
