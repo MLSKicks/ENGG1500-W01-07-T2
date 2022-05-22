@@ -33,8 +33,8 @@ class Vehicle:
 
         # Initialise motor
         if self.init_motor:
-            self.left_motor = Motor("left", 8, 9, 6)
-            self.right_motor = Motor("right", 10, 11, 7)
+            self.right_motor = Motor("left", 8, 9, 6)  # NOTE THESE ARE THE WRONG WAY AROUND DUE TO HARDWARE SETUP
+            self.left_motor = Motor("right", 10, 11, 7)
 
         # Initialise i2c devices
         if self.init_screen:
