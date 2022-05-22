@@ -195,10 +195,12 @@ class StateMachine:
             # - - - - - - - - - - - - - - - - - - - - GLOBAL TRANSITIONS - - - - - - - - - - - - - - - - - - - - #
             if hazard_forwards:  # Something is in front so lets stop ...
                 # only if we are currently travelling forwards
-                if self.state == FORWARDS or self.state == PARKING:
+                if self.state == FORWARDS:
                     self.hazard_callback_state = self.state
                     self.update_state(HAZARD_FORWARDS)
                     self.custom_target_left, self.custom_target_right = self.controller.get_remainder_target()
+                elif self.state == PARKING:
+                    self.update_state(STOP)
 
             if hazard_backwards:  # Something is behind us so lets stop ...
                 # only if we are currently travelling backwards
