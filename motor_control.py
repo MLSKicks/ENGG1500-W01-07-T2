@@ -76,8 +76,16 @@ class MotorController:
         self.max_duty = abs(max_duty)
         self.min_duty = -abs(max_duty)
 
-    def get_remainder_target(self):
-        return self.error_left, self.error_right
+    def get_averaged_remainder_target(self):
+        averaged_remainder = (abs(self.error_left) + abs(self.error_left))/2
+
+        lpolarity, rpolarity = 1, 1
+        if self.error_left < 0:
+            lpolarity = -1
+        if self.error_right < 0:
+            rpolarity = -1
+
+        return lpolarity*averaged_remainder, rpolarity*averaged_remainder
 
     def run(self):
         """Calculates the pwm values using a closed feedback loop"""
@@ -183,8 +191,7 @@ class MotorController:
         """Fix bias to correct the motor imbalances. A positive bias means we are
         increasing power to the left motor, and decreasing power to the right motor.
         New addition: if the percentage completion of one side is greater than the other,
-        try correct that as well!
-        #TODO: A better solution may be using different constants in the output function?"""
+        try correct that as well!"""
         lduty = self.duty_left
         rduty = self.duty_right
 

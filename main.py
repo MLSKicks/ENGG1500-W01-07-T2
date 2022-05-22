@@ -103,6 +103,7 @@ extra_track_states = [
     STOP
 ]
 
+
 # - - - - - - - - - - - - - - - - - - - - - STATE MACHINE - - - - - - - - - - - - - - - - - - - - - - - #
 class StateMachine:
     def __init__(self, initial_state):
@@ -236,7 +237,7 @@ class StateMachine:
                 if self.state == FORWARDS:
                     self.hazard_callback_state = self.state
                     self.update_state(HAZARD_FORWARDS)
-                    self.custom_target_left, self.custom_target_right = self.controller.get_remainder_target()
+                    self.custom_target_left, self.custom_target_right = self.controller.get_averaged_remainder_target()
                 elif self.state == PARKING:
                     self.update_state(STOP)
 
@@ -245,7 +246,7 @@ class StateMachine:
                 if self.state == BACKWARDS or self.state == UNPARKING:
                     self.hazard_callback_state = self.state
                     self.update_state(HAZARD_BACKWARDS)
-                    self.custom_target_left, self.custom_target_right = self.controller.get_remainder_target()
+                    self.custom_target_left, self.custom_target_right = self.controller.get_averaged_remainder_target()
 
             # - - - - - - - - - - - - - - - - - - - - STATE MACHINE HEADER - - - - - - - - - - - - - - - - - - - #
             self.update_state_variables()  # Updates prev_state and is_transition flag
@@ -441,7 +442,6 @@ class StateMachine:
 
 
 # - - - - - - - - - - - - - - - - - - - - MOTOR CONTROLLER METHODS - - - - - - - - - - - - - - - - - - - - - - #
-
 def test_controller(target_mm_l, target_mm_r, amplitude, offset, base_duty, bias=3, loops=30, sleep=50):
     """Test different proportionality constants for controller"""
     vehicle = Vehicle(screen=True, enc=True, motor=True)
@@ -462,7 +462,7 @@ def test2_controller(target_mm_l, target_mm_r, max_duty, bias=3, loops=30, sleep
         sleep_ms(sleep)
     vehicle.set_motor(0, 0)
 
-
+# - - - - - - - - - - - - - - - - - - - - - - - - ENTRY POINT - - - - - - - - - - - - - - - - - - - - - - - - - - #
 if __name__ == "__main__":
     statemachine = StateMachine(SPLASH_SCREEN)
     statemachine.main()
