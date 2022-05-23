@@ -10,14 +10,14 @@ ascii_cat = ("State: SPLASH\n\n\n"
              " Max Strandberg ")
 
 # max pwm values
-ROTATE_PWM = 45
-STRAIGHT_PWM = 55
+ROTATE_PWM = 50
+STRAIGHT_PWM = 60
 SLOW_STRAIGHT_PWM = 45
 SLOW_ROTATE_PWM = 40
 
 # rotations
 QUARTER_TURN = 106
-HALF_TURN = 212
+HALF_TURN = 205
 
 # avoidance methods
 NO_AVOIDANCE = 0
@@ -71,7 +71,7 @@ track_states = [
 
     # reverse in
     (ROTATE_RIGHT, QUARTER_TURN, -QUARTER_TURN, ROTATE_PWM, NO_AVOIDANCE),   # rotate right
-    (PARKING, 560*h_sf, 560*h_sf, STRAIGHT_PWM, NO_AVOIDANCE),  # forwards
+    (PARKING, 650*h_sf, 650*h_sf, SLOW_STRAIGHT_PWM, NO_AVOIDANCE),  # forwards
     STOP
 ]
 
@@ -96,19 +96,19 @@ extra_track_states = [
 
     # get to fourth roundabout
     (BACKWARDS, -1700*h_sf, -1700*h_sf, STRAIGHT_PWM, BYPASS_AVOIDANCE),  # backwards
-    (ROTATE_RIGHT, QUARTER_TURN, -QUARTER_TURN, SLOW_ROTATE_PWM, NO_AVOIDANCE),  # rotate 90 degrees right
+    (ROTATE_RIGHT, QUARTER_TURN, -QUARTER_TURN, ROTATE_PWM, NO_AVOIDANCE),  # rotate 90 degrees right
     (FORWARDS, 525*v_sf, 525*v_sf, SLOW_STRAIGHT_PWM, BYPASS_AVOIDANCE),  # forwards
     DEPLOY_SENSOR,
 
     # return home
-    (ROTATE_LEFT, -QUARTER_TURN, QUARTER_TURN, SLOW_ROTATE_PWM, NO_AVOIDANCE),  # rotate 90 degrees left
+    (ROTATE_LEFT, -QUARTER_TURN, QUARTER_TURN, ROTATE_PWM, NO_AVOIDANCE),  # rotate 90 degrees left
     (FORWARDS, 500*h_sf, 500*h_sf, SLOW_STRAIGHT_PWM, BYPASS_AVOIDANCE),  # forwards
-    (ROTATE_RIGHT, QUARTER_TURN, -QUARTER_TURN, SLOW_ROTATE_PWM, NO_AVOIDANCE),  # rotate 90 degrees right
+    (ROTATE_RIGHT, QUARTER_TURN, -QUARTER_TURN, ROTATE_PWM, NO_AVOIDANCE),  # rotate 90 degrees right
     (FORWARDS, 1700*v_sf, 1700*v_sf, STRAIGHT_PWM, BYPASS_AVOIDANCE),  # forwards
 
     # reverse in
     (ROTATE_RIGHT, QUARTER_TURN+5, -QUARTER_TURN-5, ROTATE_PWM, NO_AVOIDANCE),   # rotate right
-    (PARKING, 560*h_sf, 560*h_sf, STRAIGHT_PWM, NO_AVOIDANCE),  # forwards
+    (PARKING, 650*h_sf, 650*h_sf, SLOW_STRAIGHT_PWM, NO_AVOIDANCE),  # forwards
     STOP
 ]
 
@@ -132,10 +132,10 @@ class StateMachine:
         self.HAZARD_TIMEOUT = 3500  # ms
         self.DEPLOY_SENSOR_TIMEOUT = 500  # ms
         self.SPLASH_SCREEN_TIMEOUT = 600  # ms
-        self.STATE_CHANGE_DELAY = 700  # ms
+        self.STATE_CHANGE_DELAY = 900  # ms
         self.HAZARD_RUNBACK_MM = 20  # mm
         self.HAZARD_BYPASS_MM = 250  # mm to travel around an obstacle
-        self.HAZARD_CLEARANCE_MM = 300  # mm to travel forwards
+        self.HAZARD_CLEARANCE_MM = 400  # mm to travel forwards
 
         # Other initialisation
         self.vehicle = Vehicle(motor=True, enc=True, screen=True, ir_f=True, ir_b=False)
@@ -356,7 +356,7 @@ class StateMachine:
                 if self.controller.target_met():
                     sleep_ms(self.STATE_CHANGE_DELAY)  # (make sure we are stopped after each target)
                     if self.state_phase == 0:  # rotate left
-                        self.max_speed = SLOW_ROTATE_PWM
+                        self.max_speed = ROTATE_PWM
                         self.controller.set_target(-QUARTER_TURN, QUARTER_TURN)
                         self.state_phase += 1
 
@@ -366,7 +366,7 @@ class StateMachine:
                         self.state_phase += 1
 
                     elif self.state_phase == 2:  # rotate right, and ...
-                        self.max_speed = SLOW_ROTATE_PWM
+                        self.max_speed = ROTATE_PWM
                         self.controller.set_target(QUARTER_TURN, -QUARTER_TURN)
                         self.state_phase += 1
 
@@ -381,7 +381,7 @@ class StateMachine:
                             self.state_phase += 1
 
                     elif self.state_phase == 4:  # rotate right
-                        self.max_speed = SLOW_ROTATE_PWM
+                        self.max_speed = ROTATE_PWM
                         self.controller.set_target(QUARTER_TURN, -QUARTER_TURN)
                         self.state_phase += 1
 
@@ -391,7 +391,7 @@ class StateMachine:
                         self.state_phase += 1
 
                     elif self.state_phase == 6:  # rotate left to get back on track
-                        self.max_speed = SLOW_ROTATE_PWM
+                        self.max_speed = ROTATE_PWM
                         self.controller.set_target(-QUARTER_TURN, QUARTER_TURN)
                         self.state_phase += 1
 

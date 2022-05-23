@@ -212,8 +212,8 @@ class MotorController:
 
         sideways_error = 0
         if self.STRAIGHT_LINE_TRAVEL:
-            sideways_error = 10*(abs(self.error_left) - abs(self.error_right))
-            sideways_error = clamp(sideways_error, 27, -27)  # clamp to |27|
+            sideways_error = 18*(abs(self.error_left) - abs(self.error_right))
+            sideways_error = clamp(sideways_error, 30, -30)  # clamp to |30|
             # if our error is smaller on the right compared to the left, we want to increase
             # the left motor
         print("sideways_error=", sideways_error)
