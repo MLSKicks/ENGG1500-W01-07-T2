@@ -11,7 +11,7 @@ ascii_cat = ("State: SPLASH\n\n\n"
 
 # max pwm values
 ROTATE_PWM = 44
-STRAIGHT_PWM = 47
+STRAIGHT_PWM = 46
 SLOW_STRAIGHT_PWM = 42
 SLOW_ROTATE_PWM = 40
 
@@ -48,7 +48,7 @@ CUSTOM = 106
 
 # ! ! ! ! ! ! ! ! ! EDIT HERE ! ! ! ! ! ! ! ! ! ! #
 
-v_sf = 1.1  # vertical scale factor
+v_sf = 1.25  # vertical scale factor
 h_sf = 1  # horizontal scale factor
 
 # 2 roundabouts track
