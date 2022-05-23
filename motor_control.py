@@ -192,8 +192,8 @@ class MotorController:
         if self.error_right < 0:
             r_polarity = -1
 
-        self.duty_left += l_polarity * self.stuck_count_left * 2
-        self.duty_right += r_polarity * self.stuck_count_right * 2
+        self.duty_left += l_polarity * self.stuck_count_left * 1.3
+        self.duty_right += r_polarity * self.stuck_count_right * 1.3
 
     def duty_correction(self):
         """Fix bias to correct the motor imbalances. A positive bias means we are
@@ -212,7 +212,7 @@ class MotorController:
 
         sideways_error = 0
         if self.STRAIGHT_LINE_TRAVEL:
-            sideways_error = 18*(abs(self.error_left) - abs(self.error_right))
+            sideways_error = 22*(abs(self.error_left) - abs(self.error_right))
             sideways_error = clamp(sideways_error, 30, -30)  # clamp to |30|
             # if our error is smaller on the right compared to the left, we want to increase
             # the left motor
