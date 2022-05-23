@@ -52,7 +52,7 @@ v_sf = 1  # vertical scale factor
 h_sf = 1  # horizontal scale factor
 
 # 2 roundabouts track
-extra_track_states = [
+track_states = [
     # reverse out
     (UNPARKING, -560*h_sf, -560*h_sf, STRAIGHT_PWM, NO_AVOIDANCE),  # backwards
     (ROTATE_RIGHT, QUARTER_TURN, -QUARTER_TURN, ROTATE_PWM, NO_AVOIDANCE),   # rotate right
@@ -76,7 +76,7 @@ extra_track_states = [
 ]
 
 # 4 roundabouts track
-track_states = [
+extra_track_states = [
     # reverse out
     (UNPARKING, -560*h_sf, -560*h_sf, STRAIGHT_PWM, NO_AVOIDANCE),  # backwards
     (ROTATE_RIGHT, QUARTER_TURN, -QUARTER_TURN, ROTATE_PWM, NO_AVOIDANCE),   # rotate 90 degrees right
@@ -107,7 +107,7 @@ track_states = [
     (FORWARDS, 1700*v_sf, 1700*v_sf, STRAIGHT_PWM, BYPASS_AVOIDANCE),  # forwards
 
     # reverse in
-    (ROTATE_RIGHT, QUARTER_TURN, -QUARTER_TURN, ROTATE_PWM, NO_AVOIDANCE),   # rotate right
+    (ROTATE_RIGHT, QUARTER_TURN+5, -QUARTER_TURN-5, ROTATE_PWM, NO_AVOIDANCE),   # rotate right
     (PARKING, 560*h_sf, 560*h_sf, STRAIGHT_PWM, NO_AVOIDANCE),  # forwards
     STOP
 ]
@@ -212,10 +212,8 @@ class StateMachine:
         """Gets the next state in the queue"""
         self.vehicle.set_motor(0, 0)  # make us stop, so that we're not rolling and trick the pid control
 
-        # if skip:  # skip a roundabout due to a hazard
-        #     while((track_states[self.track_counter] is not tuple) or
-        #           (track_states[self.track_counter] is not DEPLOY_SENSOR)):
-        #         self.track_counter += 1
+        if skip:  # skip a roundabout due to a hazard
+            self.track_counter += 1
 
         next_state = track_states[self.track_counter]
 
@@ -337,8 +335,8 @@ class StateMachine:
 
                 if self.elapsed_ms() > self.HAZARD_TIMEOUT:  # if object does not move, we must bypass
                     if self.avoidance_method == ADJUST_AVOIDANCE:  # too dangerous, let's bail and go back
-                        pass  # TODO: FIX
-                        # self.update_state(self.track_next_state(path_cut=self.controller.get_mm_completed(), skip=True))
+
+                        self.update_state(self.track_next_state(path_cut=self.controller.get_mm_completed(), skip=True))
                     else:  # try the bypass manoeuvre
                         self.update_state(HAZARD_FORWARDS_BYPASS)
                 elif self.vehicle.has_screen():
